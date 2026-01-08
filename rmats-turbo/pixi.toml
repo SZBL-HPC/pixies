@@ -1,0 +1,58 @@
+[workspace]
+authors = ["HU Xuesong <87519979+huxs001@users.noreply.github.com>"]
+channels = ["conda-forge", "bioconda"]
+name = "rmats-turbo"
+platforms = ["linux-64", "osx-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+cython = ">=3"
+cmake = ">=3.27,<4"
+python = ">=3.10,<3.12"
+gcc = ">=13"
+gxx = ">=13"
+gfortran = ">=13"
+gsl = ">=2.7,<3"
+liblapack = ">=3.9,<4"
+zlib = ">=1.2,<2"
+samtools = ">=1.23,<2"
+star = ">=2.7.11b,<3"
+
+[feature.py2]
+channels = ["darts-comp-bio", "conda-forge", "bioconda"]
+
+[feature.py2.dependencies]
+r-base = ">=3.2.1,<4"
+python = ">=2.7.5,<3"
+# paired
+r-doparallel = ">=1"
+r-foreach = ">=1.5"
+r-iterators = ">=1"
+r-nloptr = ">=1.2.1,<2"
+# darts
+r-dosnow = ">=1"
+r-getopt = ">=1.20"
+r-ggplot2 = ">=3.1.1"
+r-mixtools = ">=1"
+r-rcpp = ">=1.0"
+
+[feature.py2.target.linux-64.dependencies]
+sysroot-cos7-x86_64 = ">=2.17,<3"
+
+[feature.py2.tasks]
+ins_darts = "Rscript install_r_deps.R darts"
+ins_paired = "Rscript install_r_deps.R paired"
+ins = { cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript', depends-on = ["ins_darts", "ins_paired"] }
+
+[feature.conda.dependencies]
+rmats = "*"
+samtools = ">=1.23,<2"
+
+[target.linux-64.dependencies]
+sysroot-cos7-x86_64 = ">=2.17,<3"
+
+[environments]
+ext = { features = ["py2"], no-default-feature = true }
+conda = { features = ["conda"], no-default-feature = true }
