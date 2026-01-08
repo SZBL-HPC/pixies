@@ -46,7 +46,8 @@ r-rcpp = ">=1.0"
 sysroot-cos7-x86_64 = ">=2.17,<3"
 
 [feature.py2.tasks]
-ins_darts = "Rscript rmats-turbo/install_r_deps.R darts"
+fix_darts_cxx = "ln -sf g++ .pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++"
+ins_darts = { cmd = "Rscript rmats-turbo/install_r_deps.R darts", depends-on = ["fix_darts_cxx"] }
 ins_paired = "Rscript rmats-turbo/install_r_deps.R paired"
 ins = { cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript', depends-on = ["ins_darts", "ins_paired"] }
 
