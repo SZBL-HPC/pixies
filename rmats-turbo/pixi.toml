@@ -24,6 +24,9 @@ star = ">=2.7.11b,<3"
 channels = ["darts-comp-bio", "conda-forge", "bioconda"]
 
 [feature.py2.dependencies]
+gcc = ">=13"
+gxx = ">=13"
+gfortran = ">=9.5"
 r-base = ">=3.2.1,<4"
 python = ">=2.7.5,<3"
 # paired
@@ -37,13 +40,14 @@ r-getopt = ">=1.20"
 r-ggplot2 = ">=3.1.1"
 r-mixtools = ">=1"
 r-rcpp = ">=1.0"
+#rpy2 = ">=2.8.6,<3"
 
 [feature.py2.target.linux-64.dependencies]
 sysroot-cos7-x86_64 = ">=2.17,<3"
 
 [feature.py2.tasks]
-ins_darts = "Rscript install_r_deps.R darts"
-ins_paired = "Rscript install_r_deps.R paired"
+ins_darts = "Rscript rmats-turbo/install_r_deps.R darts"
+ins_paired = "Rscript rmats-turbo/install_r_deps.R paired"
 ins = { cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript', depends-on = ["ins_darts", "ins_paired"] }
 
 [feature.conda.dependencies]
