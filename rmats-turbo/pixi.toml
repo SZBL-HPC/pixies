@@ -5,11 +5,10 @@ name = "rmats-turbo"
 platforms = ["linux-64", "osx-64"]
 version = "0.1.0"
 
-[tasks]
-
 [dependencies]
+compilers = ">=1.5"
 cython = ">=3"
-cmake = ">=3.27,<4"
+cmake = ">=3.15,<3.31"
 python = ">=3.10,<3.12"
 gcc = ">=13"
 gxx = ">=13"
@@ -20,13 +19,14 @@ zlib = ">=1.2,<2"
 samtools = ">=1.23,<2"
 star = ">=2.7.11b,<3"
 
-[feature.py2]
-channels = ["darts-comp-bio", "conda-forge", "bioconda"]
+[target.linux-64.dependencies]
+sysroot_linux-64 = "*"
+
+#[feature.py2]
+#channels = ["darts-comp-bio", "conda-forge", "bioconda"]
 
 [feature.py2.dependencies]
-gcc = ">=13"
-gxx = ">=13"
-gfortran = ">=9.5"
+compilers = ">=1.5"
 r-base = ">=3.2.1,<4"
 python = ">=2.7.5,<3"
 # paired
@@ -43,21 +43,22 @@ r-rcpp = ">=1.0"
 #rpy2 = ">=2.8.6,<3"
 
 [feature.py2.target.linux-64.dependencies]
-sysroot-cos7-x86_64 = ">=2.17,<3"
+sysroot_linux-64 = "*"
+
+[tasks]
+make_rmats = { cmd = "make", cwd = "rmats-turbo", env = { FC = "$(command -v gfortran)", CC = "$(command -v gcc)", CXX = "$(command -v g++)" } }
+test = "test_rmats"
 
 [feature.py2.tasks]
-fix_darts_cxx = "ln -sf g++ .pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++"
-ins_darts = { cmd = "Rscript rmats-turbo/install_r_deps.R darts", depends-on = ["fix_darts_cxx"] }
 ins_paired = "Rscript rmats-turbo/install_r_deps.R paired"
 ins = { cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript', depends-on = ["ins_darts", "ins_paired"] }
 
-[feature.conda.dependencies]
-rmats = "*"
-samtools = ">=1.23,<2"
+[feature.py2.target.linux-64.tasks]
+fix_darts_cxx = { cmd = "ln -sf g++ .pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++", outputs = [".pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++"] }
+ins_darts = { cmd = "Rscript rmats-turbo/install_r_deps.R darts", depends-on = ["fix_darts_cxx"] }
 
-[target.linux-64.dependencies]
-sysroot-cos7-x86_64 = ">=2.17,<3"
+[feature.py2.target.osx-64.tasks]
+ins_darts = 'echo "[!]DARTS cannot be build on macOS. Skipped."'
 
 [environments]
 ext = { features = ["py2"], no-default-feature = true }
-conda = { features = ["conda"], no-default-feature = true }
