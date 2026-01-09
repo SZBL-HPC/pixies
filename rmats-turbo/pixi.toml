@@ -46,12 +46,12 @@ r-rcpp = ">=1.0"
 sysroot_linux-64 = "*"
 
 [tasks]
-make_rmats = { cmd = "make", cwd = "rmats-turbo", env = { FC = "$(command -v gfortran)", CC = "$(command -v gcc)", CXX = "$(command -v g++)" } }
-test = "test_rmats"
+make_rmats = { cmd = "make && touch .rmats_installed", cwd = "rmats-turbo", env = { FC = "$(command -v gfortran)", CC = "$(command -v gcc)", CXX = "$(command -v g++)" }, outputs = [".rmats_installed"] }
+test = { cmd = "test_rmats", depends-on = [{ task = "ins", environment = "ext" }, "make_rmats"] }
 
 [feature.py2.tasks]
 ins_paired = "Rscript rmats-turbo/install_r_deps.R paired"
-ins = { cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript', depends-on = ["ins_darts", "ins_paired"] }
+ins = { cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript; touch .model_installed', outputs = [".model_installed"], depends-on = ["ins_darts", "ins_paired"] }
 
 [feature.py2.target.linux-64.tasks]
 fix_darts_cxx = { cmd = "ln -sf g++ .pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++", outputs = [".pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++"] }
