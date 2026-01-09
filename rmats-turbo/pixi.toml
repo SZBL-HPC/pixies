@@ -46,12 +46,15 @@ r-rcpp = ">=1.0"
 sysroot_linux-64 = "*"
 
 [tasks]
-make_rmats = { cmd = 'make && touch ../.rmats_installed; echo "[!]Run with `pixi run python3 rmats-turbo/rmats.py`"; chmod +x rmats-turbo/rmats.py', cwd = "rmats-turbo", env = { FC = "$(command -v gfortran)", CC = "$(command -v gcc)", CXX = "$(command -v g++)" }, outputs = [".rmats_installed"] }
+make_rmats = { cmd = 'make && touch ../.rmats_installed', cwd = "rmats-turbo", env = { GSL_LDFLAGS="$(gsl-config --libs)", GSL_CFLAGS="$(gsl-config --cflags)" }, outputs = [".rmats_installed"] }
+ins_rmats = "chmod +x rmats-turbo/rmats.py; ln -s ../../../../rmats .pixi/envs/default/bin/"
 test = { cmd = "test_rmats", depends-on = [ "make_rmats" ] }
+help = 'printf "[!]Build: pixi run install\n   Run 1: rmats\n   Run2a: pixi shell\n   Run2b: ./rmats-turbo/rmats.py\n"'
 install = [
 	{ task = "_clone" },
 	{ task = "make_rmats" },
-	{ task = "_wrapper" },
+	{ task = "ins_rmats" },
+	{ task = "_Rwrapper" },
 ]
 
 [tasks._git]
@@ -65,7 +68,7 @@ depends-on = [
 	{ task = "_git", args = ["https://github.com/Xinglab/DARTS.git", "DARTS"] },
 ]
 
-[tasks._wrapper]
+[tasks._Rwrapper]
 cmd = 'printf %s\n "#!/usr/bin/env bash" "exec pixi run -e ext -q --color never --as-is env RETICULATE_PYTHON=\"$(command -v python)\" Rscript \"$@\"" >.pixi/envs/default/bin/Rscript && chmod +x .pixi/envs/default/bin/Rscript'
 depends-on = [
 	{ task = "ins_darts", environment = "ext" },
@@ -76,7 +79,7 @@ depends-on = [
 ins_paired = "Rscript rmats-turbo/install_r_deps.R paired"
 ins_darts = """
 {% if pixi.is_linux %}
-	ln -sf g++ .pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++
+	ln -sf g++ .pixi/envs/ext/bin/x86_64-conda_cos6-linux-gnu-c++ &&
 	Rscript rmats-turbo/install_r_deps.R darts
 {% else %}
 	echo "[!] DARTS cannot be built on this platform. Skipped."
