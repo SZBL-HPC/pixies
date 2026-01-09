@@ -49,7 +49,7 @@ sysroot_linux-64 = "*"
 make_rmats = { cmd = 'make && touch ../.rmats_installed', cwd = "rmats-turbo", env = { GSL_LDFLAGS="$(gsl-config --libs)", GSL_CFLAGS="$(gsl-config --cflags)" }, outputs = [".rmats_installed"] }
 ins_rmats = "chmod +x rmats-turbo/rmats.py; ln -s ../../../../rmats .pixi/envs/default/bin/"
 test = { cmd = "test_rmats", depends-on = [ "make_rmats" ] }
-help = 'printf "[!]Build: pixi run install\n   Run 1: rmats\n   Run2a: pixi shell\n   Run2b: ./rmats-turbo/rmats.py\n"'
+help = 'printf "[!]Build: pixi run install\n • Run 1: ./rmats\n • Run2a: pixi shell\n · Run2b: ./rmats-turbo/rmats.py\n • Run 3: pixi run rmats\n"'
 install = [
 	{ task = "_clone" },
 	{ task = "make_rmats" },
