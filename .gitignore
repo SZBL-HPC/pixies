@@ -6,6 +6,7 @@
 rmats-turbo/rmats-turbo/
 rmats-turbo/PAIRADISE/
 rmats-turbo/DARTS/
+.*_installed
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
