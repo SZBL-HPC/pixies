@@ -21,6 +21,7 @@ star = ">=2.7.11b,<3"
 
 [target.linux-64.dependencies]
 sysroot_linux-64 = "*"
+git = ">=2.52"
 
 #[feature.py2]
 #channels = ["darts-comp-bio", "conda-forge", "bioconda"]
@@ -59,7 +60,7 @@ install = [
 
 [tasks._git]
 args = ["repo", { "arg" = "dir", "default" = "--" }]
-cmd = "test -e {{ dir }}/.git/config || git clone --filter=tree:0 {{ repo }} {{ dir }}"
+cmd = "test -e {{ dir }}/.git/config || git clone --depth=1 {{ repo }} {{ dir }}"
 
 [tasks._clone]
 depends-on = [
