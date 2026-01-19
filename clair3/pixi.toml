@@ -1,7 +1,7 @@
 [workspace]
 channels = ["conda-forge", "bioconda"]
 name = "clair3"
-platforms = ["linux-64"]
+platforms = ["linux-64", "osx-64"]
 version = "0.1.0"
 
 [tasks]
@@ -17,6 +17,13 @@ depends-on = [
 ]
 
 [dependencies]
-tensorflow = "<2.16.1"
+tensorflow = ">=2.15,<2.16.1"
 samtools = ">1"
+
+[system-requirements]
+cuda = "12.2"
+
+[target.linux-64.dependencies]
 longphase = "<2"
+tensorflow = { version = ">=2.15,<2.16.1", build = "*cuda*" }
+cuda-version = "12.*"
