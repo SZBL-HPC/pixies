@@ -7,6 +7,13 @@ version = "0.1.0"
 [tasks]
 models = "curl -L -C - -o clair3_models.tar.gz http://www.bio8.cs.hku.hk/clair3/clair3_models/clair3_models.tar.gz; mkdir -p $CONDA_PREFIX/bin/models && tar -zxvf clair3_models.tar.gz -C $CONDA_PREFIX/bin/models"
 build = "pip install . --no-build-isolation; echo '\nBuilding with g++ '; cd Clair3/preprocess/realign && g++ -std=c++14 -O1 -shared -fPIC -o realigner ssw_cpp.cpp ssw.c realigner.cpp && g++ -std=c++11 -shared -fPIC -o debruijn_graph -O3 debruijn_graph.cpp && ls -l realigner debruijn_graph"
+pypy = "curl -L -C - -o pypy3.9-v7.3.8-linux64.tar.bz2 https://downloads.python.org/pypy/pypy3.9-v7.3.8-linux64.tar.bz2 && tar -xf pypy3.9-v7.3.8-linux64.tar.bz2 -C $CONDA_PREFIX/bin && ln -sf pypy3.9-v7.3.8-linux64/bin/pypy3 $CONDA_PREFIX/bin/ && ls -l $CONDA_PREFIX/bin/pypy3"
+install = [
+	{ task = "_clone" },
+	{ task = "build" },
+	{ task = "pypy" },
+	{ task = "models" },
+]
 
 [tasks._git]
 args = ["repo", { "arg" = "dir", "default" = "--" }]
