@@ -60,7 +60,7 @@ install = [
 
 [tasks._git]
 args = ["repo", { "arg" = "dir", "default" = "--" }]
-cmd = "test -e {{ dir }}/.git/config || git clone --depth=0 {{ repo }} {{ dir }}"
+cmd = "test -e {{ dir }}/.git/config || git clone --depth=1 {{ repo }} {{ dir }}"
 
 [tasks._clone]
 depends-on = [
