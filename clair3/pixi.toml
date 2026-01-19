@@ -5,7 +5,7 @@ platforms = ["linux-64", "osx-64"]
 version = "0.1.0"
 
 [tasks]
-models = "curl -L -o clair3_models.tar.gz http://www.bio8.cs.hku.hk/clair3/clair3_models/clair3_models.tar.gz; mkdir -p /bin/models && tar -zxvf clair3_models.tar.gz -C /bin/models"
+models = "curl -L -C - -o clair3_models.tar.gz http://www.bio8.cs.hku.hk/clair3/clair3_models/clair3_models.tar.gz; mkdir -p $CONDA_PREFIX/bin/models && tar -zxvf clair3_models.tar.gz -C $CONDA_PREFIX/bin/models"
 
 [tasks._git]
 args = ["repo", { "arg" = "dir", "default" = "--" }]
@@ -19,6 +19,14 @@ depends-on = [
 [dependencies]
 tensorflow = ">=2.15,<2.16.1"
 samtools = ">1"
+compilers = ">=1.11.0,<2"
+whatshap = ">=2.8,<3"
+cffi = ">=2.0.0,<3"
+automake = ">=1.17,<2"
+cmake = ">=4.2.1,<5"
+parallel = ">=20251122,<20251123"
+tabix = ">=1.11,<2"
+boost-cpp = ">=1.85.0,<2"
 
 [system-requirements]
 cuda = "12.2"
