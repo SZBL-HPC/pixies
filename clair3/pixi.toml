@@ -1,0 +1,22 @@
+[workspace]
+channels = ["conda-forge", "bioconda"]
+name = "clair3"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+models = "curl -L -o clair3_models.tar.gz http://www.bio8.cs.hku.hk/clair3/clair3_models/clair3_models.tar.gz; mkdir -p /bin/models && tar -zxvf clair3_models.tar.gz -C /bin/models"
+
+[tasks._git]
+args = ["repo", { "arg" = "dir", "default" = "--" }]
+cmd = "test -e {{ dir }}/.git/config || git clone --depth=1 {{ repo }} {{ dir }}"
+
+[tasks._clone]
+depends-on = [
+	{ task = "_git", args = ["https://github.com/HKU-BAL/Clair3.git", "Clair3"] },
+]
+
+[dependencies]
+tensorflow = "<2.16.1"
+samtools = ">1"
+longphase = "<2"
