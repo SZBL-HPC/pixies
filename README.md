@@ -17,3 +17,10 @@ pixi run help
 ```
 
 You can symlink `./rmats-turbo/rmats` to a directory in your `PATH` so that the `rmats` command can be run directly from anywhere.
+
+## Clair3 GPU
+
+```bash
+cd clair3
+pixi run install
+```

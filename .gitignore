@@ -7,6 +7,9 @@ rmats-turbo/rmats-turbo/
 rmats-turbo/PAIRADISE/
 rmats-turbo/DARTS/
 .*_installed
+clair3/Clair3/
+clair3/clair3_models.tar.gz
+clair3/pypy3.9-v7.3.8-linux64.tar.bz2
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
