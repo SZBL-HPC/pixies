@@ -1,6 +1,7 @@
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+.DS_Store
 
 # repos
 rmats-turbo/rmats-turbo/
