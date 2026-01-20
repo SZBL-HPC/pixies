@@ -45,3 +45,6 @@ cuda = "12.2"
 longphase = "<2"
 tensorflow = { version = ">=2.15,<2.16.1", build = "*cuda*" }
 cuda-version = "12.*"
+libcudnn = ">=9,<10"
+libcublas = ">=12,<13"
+cuda-toolkit = ">=12,<13"
