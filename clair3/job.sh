@@ -28,7 +28,7 @@ echo "==========================="
 echo "timestamp,gpu_index,gpu_name,memory_total_MiB,memory_used_MiB,utilization_gpu_percent,utilization_memory_percent,power_draw_W,temperature_C,clocks_gr_MHz,cpu_total_percent,cpu_mem_used_MiB" > $LOGFILE
 
 # -------- 启动 Python 作业 ---------
-srun --ntasks=1 --cpus-per-task=32 /lenovofs1/share/hpc_core/pixi/bin/pixi run -m /lenovofs1/home/xshu/git/pixies/clair3 bash -c '
+srun --ntasks=1 --cpu-bind=none /lenovofs1/share/hpc_core/pixi/bin/pixi run -m /lenovofs1/home/xshu/git/pixies/clair3 bash -c '
 INPUT_DIR=$PIXI_PROJECT_ROOT/data
 OUTPUT_DIR=$PIXI_PROJECT_ROOT/out
 MODEL_NAME=hifi_revio
