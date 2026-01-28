@@ -28,7 +28,7 @@ echo "==========================="
 echo "timestamp,gpu_index,gpu_name,memory_total_MiB,memory_used_MiB,utilization_gpu_percent,utilization_memory_percent,power_draw_W,temperature_C,clocks_gr_MHz,cpu_total_percent,cpu_mem_used_MiB" > $LOGFILE
 
 # -------- 启动 Python 作业 ---------
-srun --ntasks=1 --cpu-bind=none /lenovofs1/share/hpc_core/pixi/bin/pixi run -m /lenovofs1/home/xshu/git/pixies/clair3 bash -c '
+/lenovofs1/share/hpc_core/pixi/bin/pixi run -m /lenovofs1/home/xshu/git/pixies/clair3 bash -c '
 INPUT_DIR=$PIXI_PROJECT_ROOT/data
 OUTPUT_DIR=$PIXI_PROJECT_ROOT/out
 MODEL_NAME=hifi_revio
@@ -49,17 +49,25 @@ JOB_PID=$!
 
 taskset -cp $JOB_PID
 
+pstree -p $JOB_PID
+
+scontrol listpids $SLURM_JOB_ID
+
 # -------- 启动后台循环监控 GPU + 作业 CPU/内存 ---------
 (
 while kill -0 $JOB_PID 2>/dev/null; do
     TIMESTAMP=$(date +%Y-%m-%d\ %H:%M:%S)
 
-    # CPU / MEM（按 PPID，安全）
     read CPU_TOTAL MEM_TOTAL <<EOF
-$(ps -eo pid,ppid,%cpu,rss | awk -v p="$JOB_PID" '
-$1==p || $2==p { cpu+=$3; mem+=$4 }
-END { printf "%.2f %.1f", cpu, mem/1024 }
-')
+$(
+  scontrol listpids "$SLURM_JOB_ID" |
+  awk '$3=="batch" {print $1}' |
+  xargs -r ps -o %cpu=,rss= -p |
+  awk '
+    { cpu += $1; mem += $2 }
+    END { printf "%.2f %.1f", cpu, mem/1024 }
+  '
+)
 EOF
 
     # GPU 信息循环
