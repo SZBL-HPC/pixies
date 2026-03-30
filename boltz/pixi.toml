@@ -6,7 +6,10 @@ platforms = ["linux-64"]
 version = "0.1.0"
 
 [tasks]
-ins = 'pip install boltz'
+ins = 'pip install boltz cuequivariance_ops_cu12 cuequivariance_ops_torch_cu12'
+
+[activation]
+env = { BOLTZ_CACHE = "boltz_cache"  }
 
 [dependencies]
 biopython = "1.84.*"
@@ -40,6 +43,8 @@ dm-tree = "0.1.8.*"
 requests = "2.32.3.*"
 types-requests = ">=2.33.0.20260327,<3"
 cuequivariance-torch = ">=0.9.1,<0.10"
+pytorch = ">=2.6.0,<3"
+tensorboard = "*"
 
 [system-requirements]
 cuda = "12"
