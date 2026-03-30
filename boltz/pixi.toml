@@ -44,7 +44,7 @@ requests = "2.32.3.*"
 types-requests = ">=2.33.0.20260327,<3"
 cuequivariance-torch = ">=0.9.1,<0.10"
 pytorch = ">=2.6.0,<3"
-tensorboard = "*"
+tensorboard = ">=2.20.0,<3"
 
 [system-requirements]
 cuda = "12"
