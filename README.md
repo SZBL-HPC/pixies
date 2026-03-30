@@ -24,3 +24,10 @@ You can symlink `./rmats-turbo/rmats` to a directory in your `PATH` so that the 
 cd clair3
 pixi run install
 ```
+
+## Boltz
+
+````shell
+cd boltz
+pixi run pip install boltz[cuda]
+````
