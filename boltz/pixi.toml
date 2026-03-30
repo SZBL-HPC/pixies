@@ -8,6 +8,7 @@ version = "0.1.0"
 [tasks]
 ins = 'pip install boltz cuequivariance_ops_cu12 cuequivariance_ops_torch_cu12'
 test = "boltz predict test.yaml --out_dir test"
+_mkdir = "mkdir -p $BOLTZ_CACHE"
 
 [activation]
 env = { BOLTZ_CACHE = "boltz_cache"  }
