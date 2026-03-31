@@ -15,10 +15,10 @@ depends-on = [ "_mkdir" ]
 args = [
 	"repo",
 	"file",
-	{ "arg" = "outdir", "default" = "$BOLTZ_CACHE" },
+	{ "arg" = "outdir", "default" = "boltz_cache" },
 	{ "arg" = "endpoint", "default" = "https://hf-mirror.com" },
 ]
-cmd = "wget -P {{outdir}} {{endpoint}}/{{repo}}/resolve/main/{{file}}"
+cmd = "wget -c -P {{outdir}} {{endpoint}}/{{repo}}/resolve/main/{{file}}"
 outputs = [ "{{outdir}}/{{file}}" ]
 
 [tasks.fetch]
@@ -29,6 +29,7 @@ depends-on = [
 	{ task = "_fetch", args = ["boltz-community/boltz-2", "boltz2_conf.ckpt"] },
 	{ task = "_fetch", args = ["boltz-community/boltz-2", "boltz2_aff.ckpt"] },
 ]
+cmd = "ls -l $BOLTZ_CACHE/"
 
 [activation]
 env = { BOLTZ_CACHE = "$PIXI_PROJECT_ROOT/boltz_cache"  }
