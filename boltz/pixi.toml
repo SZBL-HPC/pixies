@@ -11,8 +11,9 @@ extra-index-urls = ["https://download.pytorch.org/whl/cu128"]
 [system-requirements]
 cuda = "12"
 
-[activation]
-env = { BOLTZ_CACHE = "$PIXI_PROJECT_ROOT/boltz_cache"  }
+[activation.env]
+BOLTZ_CACHE = "$PIXI_PROJECT_ROOT/boltz_cache"
+LD_LIBRARY_PATH = "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
 
 [tasks]
 ins = 'pip install pytorch-lightning==2.5.0.post0'
@@ -51,8 +52,6 @@ pip = ">=26.0.1,<27"
 zlib = ">=1.3.2,<2"
 numpy = "1.26.4.*"
 openblas = ">=0.3.32,<0.4"
-#cuda-runtime = "12.*"
-#cuda-version = "12.*"
 hydra-core = "1.3.2.*"
 pandas = ">=2.2.2"
 einops = "0.8.0.*"
