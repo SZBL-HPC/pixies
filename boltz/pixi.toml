@@ -10,8 +10,28 @@ ins = 'pip install boltz cuequivariance_ops_cu12 cuequivariance_ops_torch_cu12'
 test = "boltz predict test.yaml --out_dir test"
 _mkdir = "mkdir -p $BOLTZ_CACHE"
 
+[tasks._fetch]
+depends-on = [ "_mkdir" ]
+args = [
+	"repo",
+	"file",
+	{ "arg" = "outdir", "default" = "$BOLTZ_CACHE" },
+	{ "arg" = "endpoint", "default" = "https://hf-mirror.com" },
+]
+cmd = "wget -P {{outdir}} {{endpoint}}/{{repo}}/resolve/main/{{file}}"
+outputs = [ "{{outdir}}/{{file}}" ]
+
+[tasks.fetch]
+depends-on = [
+	{ task = "_fetch", args = ["boltz-community/boltz-1", "ccd.pkl"] },
+	{ task = "_fetch", args = ["boltz-community/boltz-1", "boltz1_conf.ckpt"] },
+	{ task = "_fetch", args = ["boltz-community/boltz-2", "mols.tar"] },
+	{ task = "_fetch", args = ["boltz-community/boltz-2", "boltz2_conf.ckpt"] },
+	{ task = "_fetch", args = ["boltz-community/boltz-2", "boltz2_aff.ckpt"] },
+]
+
 [activation]
-env = { BOLTZ_CACHE = "boltz_cache"  }
+env = { BOLTZ_CACHE = "$PIXI_PROJECT_ROOT/boltz_cache"  }
 
 [dependencies]
 biopython = "1.84.*"

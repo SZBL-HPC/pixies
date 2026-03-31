@@ -1,4 +1,5 @@
 test/
+boltz_cache/
 
 # pixi environments
 .pixi/*
