@@ -6,7 +6,7 @@ platforms = ["linux-64"]
 version = "0.1.0"
 
 [tasks]
-ins = 'pip install boltz cuequivariance_ops_cu12 cuequivariance_ops_torch_cu12'
+ins = 'pip install boltz cuequivariance_ops_cu12 cuequivariance_ops_torch_cu12 && pip install pytorch-lightning==2.5.0.post0'
 test = "boltz predict ligand.yaml --out_dir test --override --use_potentials"
 _mkdir = "mkdir -p $BOLTZ_CACHE"
 
