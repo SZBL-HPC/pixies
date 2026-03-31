@@ -15,7 +15,7 @@ cuda = "12"
 env = { BOLTZ_CACHE = "$PIXI_PROJECT_ROOT/boltz_cache"  }
 
 [tasks]
-ins = 'pip install boltz cuequivariance_ops_cu12 cuequivariance_ops_torch_cu12 && pip install pytorch-lightning==2.5.0.post0'
+ins = 'pip install pytorch-lightning==2.5.0.post0'
 test = "boltz predict ligand.yaml --out_dir test --override --use_potentials"
 _mkdir = "mkdir -p $BOLTZ_CACHE"
 
@@ -43,13 +43,13 @@ cmd = "ls -l $BOLTZ_CACHE/"
 [dependencies]
 biopython = "1.84.*"
 pip = ">=26.0.1,<27"
-c-compiler = ">=1.11.0,<2"
-cmake = ">=4.3.1,<5"
-cxx-compiler = ">=1.11.0,<2"
-ninja = ">=1.13.2,<2"
-numpy = "1.26.4.*"
+#c-compiler = ">=1.11.0,<2"
+#cxx-compiler = ">=1.11.0,<2"
+#cmake = ">=4.3.1,<5"
+#ninja = ">=1.13.2,<2"
+#pkg-config = ">=0.29.2,<0.30"
 zlib = ">=1.3.2,<2"
-pkg-config = ">=0.29.2,<0.30"
+numpy = "1.26.4.*"
 openblas = ">=0.3.32,<0.4"
 #cuda-runtime = "12.*"
 #cuda-version = "12.*"
@@ -71,6 +71,7 @@ dm-tree = "0.1.8.*"
 requests = "2.32.3.*"
 types-requests = ">=2.33.0.20260327,<3"
 tensorboard = ">=2.20.0,<3"
+libstdcxx-ng = ">=15.2.0,<16"
 #cuda-compiler = ">=12.9.1,<13"
 #cuda-cudart-dev = ">=12.9.79,<13"
 
