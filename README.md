@@ -29,8 +29,6 @@ pixi run install
 
 ````shell
 cd boltz
-pixi run pip install boltz[cuda]
-# pixi run pip install pytorch-lightning==2.5.0.post0
+pixi run fetch
 pixi run test
 ````
-
