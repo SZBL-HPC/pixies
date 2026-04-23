@@ -7,10 +7,49 @@ version = "0.1.0"
 
 [tasks]
 
+[tasks._mkdir]
+args = ["dir"]
+cmd = "mkdir -p {{dir}}"
+
+[tasks._tarx]
+args = ["archive", "dir"]
+cmd = "tar -C {{dir}} -xf {{archive}}"
+
+[tasks._patch]
+args = [
+	"patchfile",
+	{ "arg" = "dir", "default" = "." },
+	{ "arg" = "strip", "default" = "0" },
+]
+cmd = "patch -f --posix -r /dev/null -d {{dir}} -p{{strip}} < {{patchfile}}"
+
+[tasks._init_dftd3]
+depends-on = [
+	{ task = "_mkdir", args = ["third-party/dftd3-0.9"] },
+	{ task = "_tarx", args = ["pkg/dftd3-0.9-src.tar.gz", "third-party"] },
+	{ task = "_patch", args = ["pkg/dftd3_fixed-a-mistake-in-the-r2r4-for-Barium.patch", "third-party/dftd3-0.9-src", "2"] },
+]
+cmd = "cd third-party/dftd3-0.9-src; make -j FC=gfortran; cp libdftd3.a dftd3_api.mod ../dftd3-0.9"
+outputs = [ "third-party/dftd3-0.9/dftd3_api.mod", "third-party/dftd3-0.9/libdftd3.a" ]
+
+[tasks._init_dlf]
+depends-on = [
+	{ task = "_mkdir", args = ["third-party"] },
+	{ task = "_tarx", args = ["pkg/dl-find-src.tar.gz", "third-party"] },
+	{ task = "_patch", args = ["pkg/dlf_allow-arg-mismatch.patch", "third-party/dl-find-src"] },
+]
+cmd = "cd third-party/dl-find-src; make -f Makefile.qbics"
+outputs = [ "third-party/dl-find/libdlf.a" ]
+
+[tasks.init]
+depends-on = [ "_init_dftd3", "_init_dlf" ]
+cmd = "tar -xf qbics-source.tar.gz"
+outputs = [ "qbics-source/bin/tools/plotspec.py" ]
+
 [dependencies]
 compilers = "*"
 blas-devel = "*"
-pkgconfig = "*"
+pkg-config = "*"
 cmake = "*"
 boost-cpp = ">=1.78"
 eigen = ">=3.4.0,<6"
@@ -28,3 +67,16 @@ cuda-libraries-dev = "<12.5"
 
 [target.osx-arm64.dependencies]
 libblas = { version = "*", build = "*accelerate" }
+
+[environments]
+mpi = ["mpi-compiler"]
+
+[feature.mpi-compiler.dependencies]
+openmpi-mpicc = ">=4.1.6,<5"
+openmpi-mpicxx = ">=4.1.6,<5"
+openmpi-mpifort = ">=4.1.6,<5"
+
+[feature.mpi-compiler.target.linux-64.dependencies]
+fftw = { version = ">=3.3.10,<4", build = "mpi_openmpi_*" }
+#hdf5 = { version = ">=1.14.6,<3", build = "mpi_openmpi_*" }
+#plumed = { version = ">=2.9.2,<3", build = "mpi_openmpi_*" }
