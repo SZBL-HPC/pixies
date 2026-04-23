@@ -61,9 +61,10 @@ xtb = ">=6.5.0,<6.6"
 
 [target.linux-64.dependencies]
 libblas = { version = "*", build = "*mkl" }
-cuda-nvcc = "<12.5"
-cuda-cudart-dev = "<12.5"
-cuda-libraries-dev = "<12.5"
+cuda-version = "==12.4"
+cuda-nvcc = "*"
+cuda-cudart-dev = "*"
+cuda-libraries-dev = "*"
 
 [target.osx-arm64.dependencies]
 libblas = { version = "*", build = "*accelerate" }
@@ -72,9 +73,10 @@ libblas = { version = "*", build = "*accelerate" }
 mpi = ["mpi-compiler"]
 
 [feature.mpi-compiler.dependencies]
-openmpi-mpicc = ">=4.1.6,<5"
-openmpi-mpicxx = ">=4.1.6,<5"
-openmpi-mpifort = ">=4.1.6,<5"
+openmpi = ">=4.1.6,<5"
+openmpi-mpicc = "*"
+openmpi-mpicxx = "*"
+openmpi-mpifort = "*"
 
 [feature.mpi-compiler.target.linux-64.dependencies]
 fftw = { version = ">=3.3.10,<4", build = "mpi_openmpi_*" }
