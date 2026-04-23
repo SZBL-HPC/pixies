@@ -1,0 +1,11 @@
+--- Makefile.qbics0	2025-02-07 08:55:26
++++ Makefile.qbics	2026-04-23 10:30:57
+@@ -104,7 +104,7 @@
+   F90        = gfortran
+   F90FLAGS   =  -C -M $(OBJDIR)
+   F90FLAGS   =   -fimplicit-none  -fbounds-check -std=gnu -Wconversion \
+-	           -Wsurprising #-fallow-argument-mismatch 
++	           -Wsurprising -fallow-argument-mismatch 
+ #  LDFLAGS    = -L/home/jkk/lib/ATLAS/Linux_HAMMER64SSE2_2/lib \
+ #                -lm -llapack -lcblas -lf77blas -latlas -lg2c
+   LDFLAGS    = -L/home/jkk/lib/ATLAS/LINUX_jk37vig_g95/ATLAS/lib/Linux_P4SSE2 \
