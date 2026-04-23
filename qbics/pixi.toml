@@ -1,0 +1,30 @@
+[workspace]
+authors = ["HU Xuesong <87519979+huxs001@users.noreply.github.com>"]
+channels = ["conda-forge"]
+name = "qbics"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+compilers = "*"
+boost-cpp = "*"
+pkgconfig = "*"
+cmake = "*"
+mkl = "*"
+mkl-include = ">=2025.3.1,<2026"
+cuda-nvcc = "<12.5"
+cuda-cudart-dev = "<12.5"
+cuda-libraries-dev = "<12.5"
+eigen = ">=5.0.1,<6"
+libxc = ">=7.0.0,<8"
+plumed = ">=2.9.2,<3"
+fftw = ">=3.3.10,<4"
+simple-dftd3-devel = ">=1.3.0,<2"
+xtb = ">=6.4.1,<7"
+hdf5 = ">=2.1.0,<3"
+onemkl-sycl-blas = ">=2025.3.1,<2026"
+onemkl-sycl-include = ">=2025.3.1,<2026"
+gsl = ">=2.7,<3"
+
