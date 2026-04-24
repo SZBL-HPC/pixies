@@ -63,19 +63,22 @@ libxc = ">=6.2.2,<7"
 plumed = ">=2.9.2,<3"
 xtb = ">=6.5.0,<6.6"
 
-[target.linux-64.dependencies]
-libblas = { version = "*", build = "*mkl" }
-libxc = { version = ">=6.2.2,<7", build = "cuda_*" }
-cuda-version = "==12.4"
-cuda-nvcc = "*"
-cuda-cudart-dev = "*"
-cuda-libraries-dev = "*"
+[feature.openblas.dependencies]
+libblas = { version = "*", build = "*openblas" }
+openblas = ">=0.3.28,<0.4"
 
-[target.osx-arm64.dependencies]
+[feature.vendor.target.linux-64.dependencies]
+libblas = { version = "*", build = "*mkl" }
+
+[feature.vendor.target.osx-arm64.dependencies]
 libblas = { version = "*", build = "*accelerate" }
 
 [environments]
+default = ["openblas"]
+cpu-open = ["openblas"]
+cpu-vendor = ["vendor"]
 mpi = ["mpi-compiler"]
+cuda = ["cuda-compiler"]
 
 [feature.mpi-compiler.dependencies]
 openmpi = ">=4.1.6,<5"
@@ -87,3 +90,13 @@ openmpi-mpifort = "*"
 fftw = { version = ">=3.3.10,<4", build = "mpi_openmpi_*" }
 #hdf5 = { version = ">=1.14.6,<3", build = "mpi_openmpi_*" }
 #plumed = { version = ">=2.9.2,<3", build = "mpi_openmpi_*" }
+
+[feature.cuda-compiler]
+platforms = ["linux-64"]
+
+[feature.cuda-compiler.dependencies]
+libxc = { version = ">=6.2.2,<7", build = "cuda_*" }
+cuda-version = "==12.4"
+cuda-nvcc = "*"
+cuda-cudart-dev = "*"
+cuda-libraries-dev = "*"
