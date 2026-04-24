@@ -130,8 +130,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/libstdcxx-devel_linux-64-12.4.0-h1762d19_102.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-ng-15.2.0-hdf11a46_18.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libuv-1.51.0-hb03c661_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-7.0.0-cpu_h54041b4_6.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-c-7.0.0-cpu_h75f4f88_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-6.2.2-cuda_h399335a_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-c-6.2.2-cuda_hbc370b7_6.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-16-2.15.1-ha9997c6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-2.15.1-h26afc86_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.2-h25fd6f3_2.conda
@@ -236,8 +236,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libsigtool-0.1.3-h98dc951_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libssh2-1.11.1-h1590b86_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libuv-1.51.0-h6caf38d_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-7.0.0-cpu_heac3c06_6.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-c-7.0.0-cpu_h7ee64da_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-6.2.2-cpu_hc3fd357_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-c-6.2.2-cpu_h5d0f620_6.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxml2-2.13.9-h4a9ca0c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.3.2-h8088a28_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-openmp-22.1.4-hc7d1edf_0.conda
@@ -391,8 +391,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/libstdcxx-devel_linux-64-12.4.0-h1762d19_102.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-ng-15.2.0-hdf11a46_18.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libuv-1.51.0-hb03c661_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-7.0.0-cpu_h54041b4_6.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-c-7.0.0-cpu_h75f4f88_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-6.2.2-cuda_h399335a_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-c-6.2.2-cuda_hbc370b7_6.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-2.13.9-h04c0eec_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.2-h25fd6f3_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/llvm-openmp-22.1.4-h4922eb0_0.conda
@@ -502,8 +502,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libsigtool-0.1.3-h98dc951_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libssh2-1.11.1-h1590b86_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libuv-1.51.0-h6caf38d_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-7.0.0-cpu_heac3c06_6.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-c-7.0.0-cpu_h7ee64da_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-6.2.2-cpu_hc3fd357_6.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-c-6.2.2-cpu_h5d0f620_6.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxml2-2.13.9-h4a9ca0c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.3.2-h8088a28_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-openmp-22.1.4-hc7d1edf_0.conda
@@ -3033,51 +3033,52 @@ packages:
   license_family: MIT
   size: 421195
   timestamp: 1753948426421
-- conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-7.0.0-cpu_h54041b4_6.conda
-  sha256: 925bde575acea8f04f5e6c0967aa7119a3271c3a98999243cc543870f92bc0ac
-  md5: 68b3da7218b07bb94a67fc32bfe01a1a
+- conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-6.2.2-cuda_h399335a_6.conda
+  sha256: 3438d4118f47e5606050d528c1fb2b4e67a394d6474d4306a1dd5ebca83936ea
+  md5: ea9abf7731f02ed62aad67d0a803bb90
   depends:
   - __glibc >=2.17,<3.0.a0
-  - libgcc >=14
+  - cuda-version >=12.0,<13
+  - libgcc >=12
   - libgfortran
-  - libgfortran5 >=14.3.0
-  - libxc-c 7.0.0 cpu_h75f4f88_6
+  - libgfortran5 >=12.4.0
+  - libxc-c 6.2.2 cuda_hbc370b7_6
   license: MPL-2.0
   license_family: Other
-  size: 57529
-  timestamp: 1762497326388
-- conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-7.0.0-cpu_heac3c06_6.conda
-  sha256: 9c4c7852cee7e2fe2bf81fff0a092c7b6eed6ed3aee5011e25f672f7e0cd244d
-  md5: 9136a79198e06803cd1bc031a6a4f632
+  size: 79565
+  timestamp: 1725349207914
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-6.2.2-cpu_hc3fd357_6.conda
+  sha256: a053016b2e690366a23ff3a2cdb6eb89018e306e3b759b99ef6b37fb234ad554
+  md5: f86e8cec7bbd54f023d594caf6c753d4
   depends:
   - __osx >=11.0
-  - libgfortran
-  - libgfortran5 >=14.3.0
-  - libgfortran5 >=15.2.0
-  - libxc-c 7.0.0 cpu_h7ee64da_6
+  - libgfortran >=5
+  - libgfortran5 >=13.2.0
+  - libxc-c 6.2.2 cpu_h5d0f620_6
   license: MPL-2.0
   license_family: Other
-  size: 56023
-  timestamp: 1762481211481
-- conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-c-7.0.0-cpu_h75f4f88_6.conda
-  sha256: 4f2678609c2cd63b20861393fc0d1635d57d6b12c374441976259b51ec3efcf2
-  md5: 3dcba84202768496e81c87db123dcc53
+  size: 76519
+  timestamp: 1725349382250
+- conda: https://conda.anaconda.org/conda-forge/linux-64/libxc-c-6.2.2-cuda_hbc370b7_6.conda
+  sha256: 03920722119e3e44a9116e3dbe52ebf3729498ac3600ef4a8b3875a37fdd92c3
+  md5: 32974b475bbb3ba71e344c9bc2a43075
   depends:
   - __glibc >=2.17,<3.0.a0
-  - libgcc >=14
+  - cuda-version >=12.0,<13
+  - libgcc >=12
   license: MPL-2.0
   license_family: Other
-  size: 58667903
-  timestamp: 1762497118211
-- conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-c-7.0.0-cpu_h7ee64da_6.conda
-  sha256: 48447188ab20b8c65d1a6c696246a56129a34ad07dcec68eae6d18a340cc9780
-  md5: 7556735c417a3cd856ea7c252eed15a7
+  size: 129969162
+  timestamp: 1725349123134
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxc-c-6.2.2-cpu_h5d0f620_6.conda
+  sha256: 3b3b409a227779e337c68aba7d931fcc9a77d223ddcde8cb1d800eeeb1c23dae
+  md5: 1adfccc911ec85775bdf596a46871458
   depends:
   - __osx >=11.0
   license: MPL-2.0
   license_family: Other
-  size: 55551606
-  timestamp: 1762481102221
+  size: 54817521
+  timestamp: 1725349283475
 - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-2.13.9-h04c0eec_0.conda
   sha256: 5d12e993894cb8e9f209e2e6bef9c90fa2b7a339a1f2ab133014b71db81f5d88
   md5: 35eeb0a2add53b1e50218ed230fa6a02

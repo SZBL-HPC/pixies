@@ -41,8 +41,12 @@ depends-on = [
 cmd = "cd third-party/dl-find-src; make -f Makefile.qbics"
 outputs = [ "third-party/dl-find/libdlf.a" ]
 
+[tasks._fetch]
+cmd = "curl -ORC - https://qbics.info/exe/qbics-source.tar.gz"
+outputs = ["qbics-source.tar.gz"]
+
 [tasks.init]
-depends-on = [ "_init_dftd3", "_init_dlf" ]
+depends-on = [ "_init_dftd3", "_init_dlf","_fetch" ]
 cmd = "tar -xf qbics-source.tar.gz"
 outputs = [ "qbics-source/bin/tools/plotspec.py" ]
 

@@ -1,0 +1,35 @@
+basis # Define basis set.
+  6-31g
+end
+
+#basinfo
+#    angular_type         spherical    # Two options: spherical; Cartesian
+#    linear_dependence  1.E-8        # The threshold below which the basis set is recognized as linear dependent.
+#end
+
+scf
+    charge      0      # The net charge.
+    spin2p1     1      # 2S+1
+    temp        0      # The electronic temperature.
+    type        U      # Two options: R, U
+    energy_cov  1.E-6  # The energy convergence threshold.
+    max_it      100    # The maximum number of iterations.
+    density_cov 1.E-6  # The density convergence threshold.
+    # nodiis           # Do not use DIIS.
+    # print_MO         # Print MO coefficients.
+    schwarz     1.E-10 # The Schwarz screening threshold.
+end
+
+mol
+    lutein.xyz
+end
+
+opt
+    fix_atoms 1-42
+end
+
+task
+    opt b3lyp
+end
+
+
