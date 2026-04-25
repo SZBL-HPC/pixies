@@ -77,8 +77,12 @@ libblas = { version = "*", build = "*accelerate" }
 default = ["openblas"]
 cpu-open = ["openblas"]
 cpu-vendor = ["vendor"]
-mpi = ["mpi-compiler"]
-cuda = ["cuda-compiler"]
+cpu-open-mpi = ["openblas","mpi-compiler"]
+cpu-vendor-mpi = ["vendor","mpi-compiler"]
+gpu-open = ["openblas","cuda-compiler"]
+gpu-vendor = ["vendor","cuda-compiler"]
+gpu-open-mpi = ["openblas","cuda-compiler","mpi-compiler"]
+gpu-vendor-mpi = ["vendor","cuda-compiler","mpi-compiler"]
 
 [feature.mpi-compiler.dependencies]
 openmpi = ">=4.1.6,<5"
