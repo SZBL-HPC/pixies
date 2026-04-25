@@ -56,22 +56,49 @@ blas-devel = "*"
 pkg-config = "*"
 cmake = "*"
 boost-cpp = ">=1.78"
-eigen = ">=3.4.0,<6"
-fftw = ">=3.3.10,<4"
+eigen-abi-devel = ">=3.4.0,<6"
+fftw-static = ">=3.3.10,<4"
 hdf5 = ">=1.14.6,<3"
 libxc = ">=6.2.2,<7"
 plumed = ">=2.9.2,<3"
 xtb = ">=6.5.0,<6.6"
 
+[feature.openblas]
+activation.env = { BLAS = "openblas" }
 [feature.openblas.dependencies]
 libblas = { version = "*", build = "*openblas" }
 openblas = ">=0.3.28,<0.4"
 
+[feature.vendor.target.linux-64]
+activation.env = { BLAS = "mkl" }
 [feature.vendor.target.linux-64.dependencies]
 libblas = { version = "*", build = "*mkl" }
-
+[feature.vendor.target.osx-arm64]
+activation.env = { BLAS = "accelerate" }
 [feature.vendor.target.osx-arm64.dependencies]
 libblas = { version = "*", build = "*accelerate" }
+
+[feature.mpi-compiler]
+activation.env = { USE_MPI = "1" }
+[feature.mpi-compiler.dependencies]
+openmpi = ">=4.1.6,<5"
+openmpi-mpicc = "*"
+openmpi-mpicxx = "*"
+openmpi-mpifort = "*"
+[feature.mpi-compiler.target.linux-64.dependencies]
+fftw-static = { version = ">=3.3.10,<4", build = "mpi_openmpi_*" }
+#hdf5 = { version = ">=1.14.6,<3", build = "mpi_openmpi_*" }
+#plumed = { version = ">=2.9.2,<3", build = "mpi_openmpi_*" }
+
+[feature.cuda-compiler]
+platforms = ["linux-64"]
+activation.env = { USE_CUDA = "1" }
+[feature.cuda-compiler.dependencies]
+libxc = { version = ">=6.2.2,<7", build = "cuda_*" }
+cuda-version = "==12.4"
+cuda-nvcc = "*"
+cuda-cudart-dev = "*"
+cuda-libraries-dev = "*"
 
 [environments]
 default = ["openblas"]
@@ -83,24 +110,3 @@ gpu-open = ["openblas","cuda-compiler"]
 gpu-vendor = ["vendor","cuda-compiler"]
 gpu-open-mpi = ["openblas","cuda-compiler","mpi-compiler"]
 gpu-vendor-mpi = ["vendor","cuda-compiler","mpi-compiler"]
-
-[feature.mpi-compiler.dependencies]
-openmpi = ">=4.1.6,<5"
-openmpi-mpicc = "*"
-openmpi-mpicxx = "*"
-openmpi-mpifort = "*"
-
-[feature.mpi-compiler.target.linux-64.dependencies]
-fftw = { version = ">=3.3.10,<4", build = "mpi_openmpi_*" }
-#hdf5 = { version = ">=1.14.6,<3", build = "mpi_openmpi_*" }
-#plumed = { version = ">=2.9.2,<3", build = "mpi_openmpi_*" }
-
-[feature.cuda-compiler]
-platforms = ["linux-64"]
-
-[feature.cuda-compiler.dependencies]
-libxc = { version = ">=6.2.2,<7", build = "cuda_*" }
-cuda-version = "==12.4"
-cuda-nvcc = "*"
-cuda-cudart-dev = "*"
-cuda-libraries-dev = "*"
