@@ -29,7 +29,7 @@ depends-on = [
 	{ task = "_tarx", args = ["pkg/dftd3-0.9-src.tar.gz", "third-party"] },
 	{ task = "_patch", args = ["pkg/dftd3_fixed-a-mistake-in-the-r2r4-for-Barium.patch", "third-party/dftd3-0.9-src", "2"] },
 ]
-cmd = "cd third-party/dftd3-0.9-src; make -j FC=gfortran; cp libdftd3.a dftd3_api.mod ../dftd3-0.9"
+cmd = "cd third-party/dftd3-0.9-src; make -j FC=gfortran FCFLAGS='-O2 -fPIE'; cp libdftd3.a dftd3_api.mod ../dftd3-0.9"
 outputs = [ "third-party/dftd3-0.9/dftd3_api.mod", "third-party/dftd3-0.9/libdftd3.a" ]
 
 [tasks._init_dlf]
@@ -61,7 +61,7 @@ fftw-static = ">=3.3.10,<4"
 hdf5 = ">=1.14.6,<3"
 libxc = ">=6.2.2,<7"
 plumed = ">=2.9.2,<3"
-xtb = ">=6.5.0,<6.6"
+xtb = ">=6.5.0,<7"
 
 [activation.env]
 OMP_NUM_THREADS = "8"

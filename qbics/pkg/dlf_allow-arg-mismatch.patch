@@ -5,7 +5,7 @@
    F90FLAGS   =  -C -M $(OBJDIR)
    F90FLAGS   =   -fimplicit-none  -fbounds-check -std=gnu -Wconversion \
 -	           -Wsurprising #-fallow-argument-mismatch 
-+	           -Wsurprising -fallow-argument-mismatch 
++	           -Wsurprising -fallow-argument-mismatch -O2 -fPIE -std=legacy
  #  LDFLAGS    = -L/home/jkk/lib/ATLAS/Linux_HAMMER64SSE2_2/lib \
  #                -lm -llapack -lcblas -lf77blas -latlas -lg2c
    LDFLAGS    = -L/home/jkk/lib/ATLAS/LINUX_jk37vig_g95/ATLAS/lib/Linux_P4SSE2 \
