@@ -63,18 +63,21 @@ libxc = ">=6.2.2,<7"
 plumed = ">=2.9.2,<3"
 xtb = ">=6.5.0,<6.6"
 
+[activation.env]
+OMP_NUM_THREADS = "8"
+
 [feature.openblas]
-activation.env = { BLAS = "openblas" }
+activation.env = { BLAS = "openblas", OPENBLAS_NUM_THREADS = "1" }
 [feature.openblas.dependencies]
 libblas = { version = "*", build = "*openblas" }
 openblas = ">=0.3.28,<0.4"
 
 [feature.vendor.target.linux-64]
-activation.env = { BLAS = "mkl" }
+activation.env = { BLAS = "mkl", MKL_NUM_THREADS = "1" }
 [feature.vendor.target.linux-64.dependencies]
 libblas = { version = "*", build = "*mkl" }
 [feature.vendor.target.osx-arm64]
-activation.env = { BLAS = "accelerate" }
+activation.env = { BLAS = "accelerate", VECLIB_MAXIMUM_THREADS = "1" }
 [feature.vendor.target.osx-arm64.dependencies]
 libblas = { version = "*", build = "*accelerate" }
 
