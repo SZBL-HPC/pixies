@@ -31,7 +31,7 @@ class FragSpectrumScanDatabaseBoostdb: public FragSpectrumScanDatabase
 
 public:
 
-  FragSpectrumScanDatabaseBoostdb(std::string id = 0);
+  FragSpectrumScanDatabaseBoostdb(std::string id = "");
   
   virtual ~FragSpectrumScanDatabaseBoostdb();
   

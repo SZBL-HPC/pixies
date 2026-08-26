@@ -28,7 +28,7 @@ class FragSpectrumScanDatabaseLeveldb : public FragSpectrumScanDatabase
 
 public:
     
-  FragSpectrumScanDatabaseLeveldb(std::string id = 0);
+  FragSpectrumScanDatabaseLeveldb(std::string id = "");
 
   virtual ~FragSpectrumScanDatabaseLeveldb();
 

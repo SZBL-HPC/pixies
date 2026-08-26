@@ -65,9 +65,9 @@ class FragSpectrumScanDatabase {
   
   public:
     
-    FragSpectrumScanDatabase(string id=0);
+    FragSpectrumScanDatabase(string id = "");
     
-    ~FragSpectrumScanDatabase(){};
+    virtual ~FragSpectrumScanDatabase() = default;
     
     bool initRTime(map<int, vector<double> >* scan2rt_par);
     

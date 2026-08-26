@@ -28,7 +28,7 @@ class FragSpectrumScanDatabaseTokyoDB : public FragSpectrumScanDatabase
 
 public:
 
-  FragSpectrumScanDatabaseTokyoDB(std::string id = 0);
+  FragSpectrumScanDatabaseTokyoDB(std::string id = "");
 
   virtual ~FragSpectrumScanDatabaseTokyoDB();
 
