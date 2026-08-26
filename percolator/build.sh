@@ -11,8 +11,7 @@ readonly PIXI=(pixi run --manifest-path "${ROOT_DIR}/pixi.toml")
 readonly DEPENDENCY_PREFIX="$("${PIXI[@]}" printenv CONDA_PREFIX)"
 readonly EIGEN_OVERRIDE_DIR="${BUILD_DIR}/_eigen-pixi"
 readonly CONVERTER_BUILD_DIR="${CONVERTER_BUILD_DIR:-${BUILD_DIR}/converters}"
-readonly CONVERTER_SOURCE_DIR="${BUILD_DIR}/_converter-source"
-readonly CONVERTER_SOURCE_REVISION="${CONVERTER_SOURCE_REVISION:-44ad230175c4cbe9d9d7ecb64202e9fd26181103}"
+readonly CONVERTER_SOURCE_DIR="${CONVERTER_SOURCE_DIR:-${ROOT_DIR}/percolator-converters}"
 
 XSD_EXECUTABLE="${XSD_EXECUTABLE:-}"
 XSD_INCLUDE_DIR="${XSD_INCLUDE_DIR:-}"
@@ -43,6 +42,7 @@ cmake_args=(
   -DCMAKE_PREFIX_PATH="${DEPENDENCY_PREFIX}"
   -DBOOST_ROOT="${DEPENDENCY_PREFIX}"
   -DBoost_ROOT="${DEPENDENCY_PREFIX}"
+  -DBoost_USE_STATIC_LIBS=OFF
   -DBoost_NO_SYSTEM_PATHS=ON
   -DFETCHCONTENT_SOURCE_DIR_EIGEN="${EIGEN_OVERRIDE_DIR}"
   -DGOOGLE_TEST=0
@@ -86,72 +86,20 @@ if [[ -z "${XSD_EXECUTABLE}" ]]; then
   exit 1
 fi
 
-if ! git -C "${SOURCE_DIR}" cat-file -e "${CONVERTER_SOURCE_REVISION}^{commit}" 2>/dev/null; then
-  git -C "${SOURCE_DIR}" fetch --no-tags origin "${CONVERTER_SOURCE_REVISION}"
+if [[ ! -f "${CONVERTER_SOURCE_DIR}/CMakeLists.txt" ]]; then
+  printf 'Converter source directory is missing: %s\n' "${CONVERTER_SOURCE_DIR}" >&2
+  exit 1
 fi
-
-if [[ -d "${CONVERTER_SOURCE_DIR}" ]]; then
-  "${PIXI[@]}" cmake -E remove_directory "${CONVERTER_SOURCE_DIR}"
-fi
-"${PIXI[@]}" cmake -E make_directory "${CONVERTER_SOURCE_DIR}"
-
-# The current upstream tree removed the converters. Overlay their last complete
-# source tree onto a temporary copy so the checkout itself remains unchanged.
-git -C "${SOURCE_DIR}" archive --format=tar HEAD \
-  | tar -xf - -C "${CONVERTER_SOURCE_DIR}"
-git -C "${SOURCE_DIR}" archive --format=tar "${CONVERTER_SOURCE_REVISION}" \
-  cmake/FindXsd.cmake \
-  cmake/FindXercesC.cmake \
-  src/converters \
-  src/Enzyme.cpp \
-  src/Enzyme.h \
-  src/Globals.cpp \
-  src/Globals.h.cmake \
-  src/Logger.cpp \
-  src/Logger.h \
-  src/MassHandler.cpp \
-  src/MassHandler.h \
-  src/MyException.cpp \
-  src/MyException.h \
-  src/Option.cpp \
-  src/Option.h \
-  src/parser.cxx \
-  src/parser.hxx \
-  src/serializer.cxx \
-  src/serializer.hxx \
-  src/TmpDir.cpp \
-  src/TmpDir.h \
-  src/xml \
-  | tar -xf - -C "${CONVERTER_SOURCE_DIR}"
-
-# The historical MSToolkit code uses std::random_shuffle, removed in C++17.
-compat_source="${CONVERTER_SOURCE_DIR}/src/converters/MSToolkit/crawutils.cpp"
-compat_source_tmp="${compat_source}.tmp"
-"${PIXI[@]}" gawk '
-  BEGIN { replaced = 0 }
-  /^[[:space:]]*#include <algorithm>[[:space:]]*$/ {
-    print
-    print "#include <random>"
-    next
-  }
-  /std::random_shuffle\( v\.begin\(\), v\.end\(\) \);/ {
-    print "          std::shuffle(v.begin(), v.end(), std::mt19937(std::random_device{}()));"
-    replaced = 1
-    next
-  }
-  { print }
-  END { if (!replaced) exit 1 }
-' "${compat_source}" > "${compat_source_tmp}"
-mv "${compat_source_tmp}" "${compat_source}"
 
 converter_cmake_args=(
-  -S "${CONVERTER_SOURCE_DIR}/src/converters"
+  -S "${CONVERTER_SOURCE_DIR}"
   -B "${CONVERTER_BUILD_DIR}"
   -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
   -DCMAKE_PREFIX_PATH="${DEPENDENCY_PREFIX}"
   -DBOOST_ROOT="${DEPENDENCY_PREFIX}"
   -DBoost_ROOT="${DEPENDENCY_PREFIX}"
+  -DBoost_USE_STATIC_LIBS=OFF
   -DBoost_NO_SYSTEM_PATHS=ON
   -DRPCDIR="${DEPENDENCY_PREFIX}"
   -DSERIALIZE=Boost
