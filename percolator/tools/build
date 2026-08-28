@@ -91,6 +91,11 @@ esac
 
 readonly PIXI=(pixi run --manifest-path "${ROOT_DIR}/pixi.toml")
 readonly DEPENDENCY_PREFIX="$("${PIXI[@]}" printenv CONDA_PREFIX)"
+XSD_CXX_LOPTIONS="-L${DEPENDENCY_PREFIX}/lib -Wl,-rpath,${DEPENDENCY_PREFIX}/lib"
+if [[ "$(uname -s)" == Darwin ]]; then
+  XSD_CXX_LOPTIONS+=" -Wl,-headerpad_max_install_names"
+fi
+readonly XSD_CXX_LOPTIONS
 
 command_available() {
   if [[ "$1" == */* ]]; then
@@ -222,7 +227,10 @@ build_xsd() {
       "${BDEP_COMMAND}" config create @xsd-host "${XSD_HOST_BUILD_DIR}" \
         --type host cc \
         "config.cxx=${XSD_CXX}" \
-        "config.cxx.std=${XSD_CXX_STD}"
+        "config.cxx.std=${XSD_CXX_STD}" \
+        "config.cxx.poptions=-I${DEPENDENCY_PREFIX}/include" \
+        "config.cxx.loptions=${XSD_CXX_LOPTIONS}" \
+        config.import.libxerces_c.xerces_c.lib=xerces-c
     )
   fi
 
@@ -233,6 +241,9 @@ build_xsd() {
         --type target cc \
         "config.cxx=${XSD_CXX}" \
         "config.cxx.std=${XSD_CXX_STD}" \
+        "config.cxx.poptions=-I${DEPENDENCY_PREFIX}/include" \
+        "config.cxx.loptions=${XSD_CXX_LOPTIONS}" \
+        config.import.libxerces_c.xerces_c.lib=xerces-c \
         "config.install.root=${XSD_INSTALL_DIR}"
     )
   fi
@@ -244,6 +255,9 @@ build_xsd() {
         --type target cc \
         "config.cxx=${XSD_CXX}" \
         "config.cxx.std=${XSD_CXX_STD}" \
+        "config.cxx.poptions=-I${DEPENDENCY_PREFIX}/include" \
+        "config.cxx.loptions=${XSD_CXX_LOPTIONS}" \
+        config.import.libxerces_c.xerces_c.lib=xerces-c \
         "config.bin.rpath=${XSD_INSTALL_DIR}/lib" \
         "config.install.root=${XSD_INSTALL_DIR}"
     )
@@ -252,7 +266,8 @@ build_xsd() {
   if [[ ! -f "${XSD_HOST_INIT_MARKER}" ]]; then
     (
       cd "${XSD_SOURCE_DIR}"
-      "${BDEP_COMMAND}" init @xsd-host -d xsd
+      "${BDEP_COMMAND}" init @xsd-host -d xsd \
+        '?sys:libxerces-c/*' config.xsd.develop=false
       : >"${XSD_HOST_INIT_MARKER}"
     )
   fi
@@ -268,7 +283,8 @@ build_xsd() {
   if [[ ! -f "${XSD_INSTALL_INIT_MARKER}" ]]; then
     (
       cd "${XSD_SOURCE_DIR}"
-      "${BDEP_COMMAND}" init @xsd-install -d xsd
+      "${BDEP_COMMAND}" init @xsd-install -d xsd \
+        '?sys:libxerces-c/*' config.xsd.develop=false
       : >"${XSD_INSTALL_INIT_MARKER}"
     )
   fi
