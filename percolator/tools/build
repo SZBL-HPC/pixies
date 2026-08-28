@@ -1,0 +1,396 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly SOURCE_DIR="${SOURCE_DIR:-${ROOT_DIR}/pkg/percolator}"
+readonly BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
+readonly INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-${ROOT_DIR}/release}"
+readonly BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}"
+readonly EIGEN_OVERRIDE_DIR="${BUILD_DIR}/_eigen-pixi"
+readonly CONVERTER_BUILD_DIR="${CONVERTER_BUILD_DIR:-${BUILD_DIR}/converters}"
+readonly CONVERTER_SOURCE_DIR="${CONVERTER_SOURCE_DIR:-${ROOT_DIR}/percolator-converters}"
+readonly TOOLS_DIR="${TOOLS_DIR:-${ROOT_DIR}/tools}"
+readonly BUILD2_SOURCE_DIR="${BUILD2_SOURCE_DIR:-${BUILD_DIR}/build2-toolchain-0.18.1}"
+readonly BUILD2_BUILD_DIR="${BUILD2_BUILD_DIR:-${BUILD_DIR}/build2}"
+readonly BUILD2_BOOTSTRAP_DIR="${BUILD2_BOOTSTRAP_DIR:-${BUILD2_BUILD_DIR}/bootstrap}"
+readonly BUILD2_BOOTSTRAP_STAGE1_BINARY="${BUILD2_BOOTSTRAP_DIR}/b-boot-stage1"
+readonly BUILD2_BOOTSTRAP_BINARY="${BUILD2_BOOTSTRAP_DIR}/b-boot"
+readonly BUILD2_INSTALL_DIR="${BUILD2_INSTALL_DIR:-${TOOLS_DIR}}"
+readonly BUILD2_CXX="${BUILD2_CXX:-${CXX:-c++}}"
+readonly XSD_SOURCE_DIR="${XSD_SOURCE_DIR:-${ROOT_DIR}/pkg/xsd}"
+readonly XSD_BUILD_DIR="${XSD_BUILD_DIR:-${BUILD_DIR}/xsd}"
+readonly XSD_HOST_BUILD_DIR="${XSD_HOST_BUILD_DIR:-${XSD_BUILD_DIR}/host}"
+readonly XSD_TARGET_BUILD_DIR="${XSD_TARGET_BUILD_DIR:-${XSD_BUILD_DIR}/target}"
+readonly XSD_INSTALL_BUILD_DIR="${XSD_INSTALL_BUILD_DIR:-${XSD_BUILD_DIR}/install-build}"
+readonly XSD_INSTALL_DIR="${XSD_INSTALL_DIR:-${TOOLS_DIR}}"
+readonly XSD_HOST_INIT_MARKER="${XSD_HOST_BUILD_DIR}/.bdep-initialized"
+readonly XSD_TARGET_INIT_MARKER="${XSD_TARGET_BUILD_DIR}/.bdep-initialized"
+readonly XSD_INSTALL_INIT_MARKER="${XSD_INSTALL_BUILD_DIR}/.bdep-initialized"
+XSD_CXX="${XSD_CXX:-${CXX:-c++}}"
+if [[ -z "${CXX:-}" && "$(uname -s)" == Darwin && -x /usr/bin/c++ ]]; then
+  XSD_CXX=/usr/bin/c++
+fi
+readonly XSD_CXX
+readonly XSD_CXX_STD="${XSD_CXX_STD:-c++17}"
+BDEP_COMMAND="${BDEP:-$(command -v bdep || true)}"
+B_COMMAND="${B:-$(command -v b || true)}"
+if [[ -z "${BDEP_COMMAND}" && -x "${BUILD2_INSTALL_DIR}/bin/bdep" ]]; then
+  BDEP_COMMAND="${BUILD2_INSTALL_DIR}/bin/bdep"
+fi
+if [[ -z "${B_COMMAND}" && -x "${BUILD2_INSTALL_DIR}/bin/b" ]]; then
+  B_COMMAND="${BUILD2_INSTALL_DIR}/bin/b"
+fi
+
+usage() {
+  cat <<'EOF'
+Usage: build.sh [TARGET]
+
+Build the project with CMake. TARGET defaults to all.
+
+Targets:
+  all         Build percolator and converters
+  percolator  Build only the main percolator binaries
+  converters  Build only msgf2pin, sqt2pin, and tandem2pin
+
+Options:
+  -h, --help  Show this help message
+
+Environment variables:
+  BUILD_DIR, CMAKE_INSTALL_PREFIX, CMAKE_BUILD_TYPE
+  CONVERTER_BUILD_DIR, CONVERTER_SOURCE_DIR
+  TOOLS_DIR, BUILD2_SOURCE_DIR, BUILD2_BUILD_DIR, BUILD2_BOOTSTRAP_DIR
+  BUILD2_INSTALL_DIR, BUILD2_CXX
+  XSD_SOURCE_DIR, XSD_BUILD_DIR, XSD_HOST_BUILD_DIR
+  XSD_TARGET_BUILD_DIR, XSD_INSTALL_BUILD_DIR, XSD_INSTALL_DIR, XSD_CXX
+  XSD_CXX_STD
+  BDEP, B
+EOF
+}
+
+if [[ $# -gt 1 ]]; then
+  printf 'Error: expected at most one target argument.\n\n' >&2
+  usage >&2
+  exit 2
+fi
+
+target="${1:-all}"
+case "${target}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  all|percolator|converters)
+    ;;
+  *)
+    printf 'Error: unknown target: %s\n\n' "${target}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+readonly PIXI=(pixi run --manifest-path "${ROOT_DIR}/pixi.toml")
+readonly DEPENDENCY_PREFIX="$("${PIXI[@]}" printenv CONDA_PREFIX)"
+
+command_available() {
+  if [[ "$1" == */* ]]; then
+    [[ -x "$1" ]]
+  else
+    command -v "$1" >/dev/null 2>&1
+  fi
+}
+
+build_build2() {
+  if command_available "${B_COMMAND}" && command_available "${BDEP_COMMAND}"; then
+    return
+  fi
+
+  if [[ ! -f "${BUILD2_SOURCE_DIR}/build2/bootstrap.sh" ||
+        ! -f "${BUILD2_SOURCE_DIR}/bpkg/buildfile" ||
+        ! -f "${BUILD2_SOURCE_DIR}/bdep/buildfile" ]]; then
+    printf 'build2 toolchain checkout is incomplete: %s\n' "${BUILD2_SOURCE_DIR}" >&2
+    printf '%s\n' 'Run `pixi run clone` before building.' >&2
+    exit 1
+  fi
+
+  if [[ -e "${BUILD2_SOURCE_DIR}/build/config.build" &&
+        ! -f "${BUILD2_INSTALL_DIR}/.toolchain-installed" ]]; then
+    printf 'Removing stale build2 configuration: %s\n' \
+      "${BUILD2_SOURCE_DIR}/build/config.build"
+    rm -f "${BUILD2_SOURCE_DIR}/build/config.build"
+  fi
+
+  printf 'Building local build2 toolchain...\n'
+  mkdir -p "${BUILD2_BOOTSTRAP_DIR}" "${BUILD2_INSTALL_DIR}"
+
+  (
+    cd "${BUILD2_SOURCE_DIR}/build2"
+    bash ./bootstrap.sh "${BUILD2_CXX}" -w
+    ./b/b-boot --version
+    mv b/b-boot "${BUILD2_BOOTSTRAP_STAGE1_BINARY}"
+  )
+
+  (
+    cd "${BUILD2_SOURCE_DIR}"
+    "${BUILD2_BOOTSTRAP_STAGE1_BINARY}" configure: \
+      "${BUILD2_SOURCE_DIR}/libbutl/@${BUILD2_BUILD_DIR}/bootstrap-libbutl/" \
+      "config.cxx=${BUILD2_CXX}" \
+      config.bin.lib=static
+    "${BUILD2_BOOTSTRAP_STAGE1_BINARY}" update: \
+      "${BUILD2_BUILD_DIR}/bootstrap-libbutl/"
+    "${BUILD2_BOOTSTRAP_STAGE1_BINARY}" configure: \
+      "${BUILD2_SOURCE_DIR}/build2/@${BUILD2_BUILD_DIR}/bootstrap-build2/" \
+      config.build2_toolchain.build.readonly=true \
+      "config.cxx=${BUILD2_CXX}" \
+      config.bin.lib=static \
+      "config.import.libbutl=${BUILD2_BUILD_DIR}/bootstrap-libbutl/"
+    "${BUILD2_BOOTSTRAP_STAGE1_BINARY}" update: \
+      "${BUILD2_BUILD_DIR}/bootstrap-build2/"
+    mv "${BUILD2_BUILD_DIR}/bootstrap-build2/b/b" "${BUILD2_BOOTSTRAP_BINARY}"
+    "${BUILD2_BOOTSTRAP_BINARY}" --version
+    "${BUILD2_BOOTSTRAP_BINARY}" configure: \
+      "${BUILD2_SOURCE_DIR}/libbutl/@${BUILD2_BUILD_DIR}/libbutl/" \
+      config.config.hermetic=true \
+      "config.cxx=${BUILD2_CXX}" \
+      config.bin.lib=shared \
+      "config.bin.rpath=${BUILD2_INSTALL_DIR}/lib" \
+      "config.install.root=${BUILD2_INSTALL_DIR}"
+    "${BUILD2_BOOTSTRAP_BINARY}" configure: \
+      "${BUILD2_SOURCE_DIR}/@${BUILD2_BUILD_DIR}/" \
+      config.build2_toolchain.build.readonly=true \
+      config.config.hermetic=true \
+      "config.cxx=${BUILD2_CXX}" \
+      config.cc.coptions=-O3 \
+      config.bin.lib=shared \
+      "config.bin.rpath=${BUILD2_INSTALL_DIR}/lib" \
+      "config.install.root=${BUILD2_INSTALL_DIR}" \
+      "config.import.libbutl=${BUILD2_BUILD_DIR}/libbutl/"
+    "${BUILD2_BOOTSTRAP_BINARY}" update-for-install: \
+      "${BUILD2_BUILD_DIR}/build2/" \
+      "${BUILD2_BUILD_DIR}/bpkg/" \
+      "${BUILD2_BUILD_DIR}/bdep/"
+    "${BUILD2_BOOTSTRAP_BINARY}" install: \
+      "${BUILD2_BUILD_DIR}/build2/" \
+      "${BUILD2_BUILD_DIR}/bpkg/" \
+      "${BUILD2_BUILD_DIR}/bdep/"
+  )
+
+  if [[ ! -x "${BUILD2_INSTALL_DIR}/bin/b" ||
+        ! -x "${BUILD2_INSTALL_DIR}/bin/bdep" ]]; then
+    printf 'build2 toolchain was not installed: %s\n' "${BUILD2_INSTALL_DIR}" >&2
+    exit 1
+  fi
+
+  B_COMMAND="${B:-${BUILD2_INSTALL_DIR}/bin/b}"
+  BDEP_COMMAND="${BDEP:-${BUILD2_INSTALL_DIR}/bin/bdep}"
+  : >"${BUILD2_INSTALL_DIR}/.toolchain-installed"
+  export PATH="${BUILD2_INSTALL_DIR}/bin:${PATH}"
+}
+
+remove_stale_xsd_config() {
+  local config_name="$1"
+  local config_dir="$2"
+
+  if [[ ! -d "${config_dir}/.bpkg" && -d "${XSD_SOURCE_DIR}/.bdep" ]]; then
+    "${BDEP_COMMAND}" config remove "@${config_name}" >/dev/null 2>&1 || true
+  fi
+}
+
+build_xsd() {
+  if [[ ! -f "${XSD_SOURCE_DIR}/xsd/manifest" || ! -f "${XSD_SOURCE_DIR}/repositories.manifest" ]]; then
+    printf 'XSD source checkout is missing: %s\n' "${XSD_SOURCE_DIR}" >&2
+    printf '%s\n' 'Run `pixi run clone` before building.' >&2
+    exit 1
+  fi
+
+  build_build2
+
+  remove_stale_xsd_config xsd-host "${XSD_HOST_BUILD_DIR}"
+  remove_stale_xsd_config xsd-target "${XSD_TARGET_BUILD_DIR}"
+  remove_stale_xsd_config xsd-install "${XSD_INSTALL_BUILD_DIR}"
+
+  if [[ ! -d "${XSD_SOURCE_DIR}/.bdep" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" init --empty
+    )
+  fi
+
+  if [[ ! -d "${XSD_HOST_BUILD_DIR}/.bpkg" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" config create @xsd-host "${XSD_HOST_BUILD_DIR}" \
+        --type host cc \
+        "config.cxx=${XSD_CXX}" \
+        "config.cxx.std=${XSD_CXX_STD}"
+    )
+  fi
+
+  if [[ ! -d "${XSD_TARGET_BUILD_DIR}/.bpkg" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" config create @xsd-target "${XSD_TARGET_BUILD_DIR}" \
+        --type target cc \
+        "config.cxx=${XSD_CXX}" \
+        "config.cxx.std=${XSD_CXX_STD}" \
+        "config.install.root=${XSD_INSTALL_DIR}"
+    )
+  fi
+
+  if [[ ! -d "${XSD_INSTALL_BUILD_DIR}/.bpkg" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" config create @xsd-install "${XSD_INSTALL_BUILD_DIR}" \
+        --type target cc \
+        "config.cxx=${XSD_CXX}" \
+        "config.cxx.std=${XSD_CXX_STD}" \
+        "config.bin.rpath=${XSD_INSTALL_DIR}/lib" \
+        "config.install.root=${XSD_INSTALL_DIR}"
+    )
+  fi
+
+  if [[ ! -f "${XSD_HOST_INIT_MARKER}" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" init @xsd-host -d xsd
+      : >"${XSD_HOST_INIT_MARKER}"
+    )
+  fi
+
+  if [[ ! -f "${XSD_TARGET_INIT_MARKER}" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" init @xsd-target -d libxsd
+      : >"${XSD_TARGET_INIT_MARKER}"
+    )
+  fi
+
+  if [[ ! -f "${XSD_INSTALL_INIT_MARKER}" ]]; then
+    (
+      cd "${XSD_SOURCE_DIR}"
+      "${BDEP_COMMAND}" init @xsd-install -d xsd
+      : >"${XSD_INSTALL_INIT_MARKER}"
+    )
+  fi
+
+  (
+    cd "${XSD_SOURCE_DIR}"
+    "${B_COMMAND}" install: "${XSD_INSTALL_BUILD_DIR}/xsd/"
+    "${B_COMMAND}" install: "${XSD_TARGET_BUILD_DIR}/libxsd/"
+  )
+
+  if [[ ! -x "${XSD_INSTALL_DIR}/bin/xsd" ]]; then
+    printf 'XSD compiler was not installed: %s\n' "${XSD_INSTALL_DIR}/bin/xsd" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "${XSD_INSTALL_DIR}/include/xsd/cxx/parser/elements.hxx" ]]; then
+    printf 'XSD runtime headers were not installed: %s\n' \
+      "${XSD_INSTALL_DIR}/include/xsd/cxx/parser/elements.hxx" >&2
+    exit 1
+  fi
+}
+
+build_percolator() {
+  if [[ ! -d "${DEPENDENCY_PREFIX}/include/eigen3" ]]; then
+    printf 'Pixi Eigen headers not found: %s\n' "${DEPENDENCY_PREFIX}/include/eigen3" >&2
+    exit 1
+  fi
+
+  if [[ -d "${EIGEN_OVERRIDE_DIR}" ]]; then
+    "${PIXI[@]}" cmake -E remove_directory "${EIGEN_OVERRIDE_DIR}"
+  fi
+
+  "${PIXI[@]}" cmake -E make_directory "${EIGEN_OVERRIDE_DIR}"
+  "${PIXI[@]}" cmake -E copy_directory \
+    "${DEPENDENCY_PREFIX}/include/eigen3" \
+    "${EIGEN_OVERRIDE_DIR}"
+  "${PIXI[@]}" cmake -E copy_if_different \
+    "${ROOT_DIR}/cmake/eigen-pixi-override/CMakeLists.txt" \
+    "${EIGEN_OVERRIDE_DIR}/CMakeLists.txt"
+
+  local -a cmake_args=(
+    -S "${SOURCE_DIR}"
+    -B "${BUILD_DIR}"
+    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+    -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
+    -DCMAKE_PREFIX_PATH="${DEPENDENCY_PREFIX}"
+    -DBOOST_ROOT="${DEPENDENCY_PREFIX}"
+    -DBoost_ROOT="${DEPENDENCY_PREFIX}"
+    -DBoost_USE_STATIC_LIBS=OFF
+    -DBoost_NO_SYSTEM_PATHS=ON
+    -DFETCHCONTENT_SOURCE_DIR_EIGEN="${EIGEN_OVERRIDE_DIR}"
+    -DGOOGLE_TEST=0
+    -DNO_TESTS=ON
+  )
+
+  "${PIXI[@]}" cmake "${cmake_args[@]}"
+  "${PIXI[@]}" cmake --build "${BUILD_DIR}" --parallel
+  "${PIXI[@]}" cmake --install "${BUILD_DIR}" --prefix "${INSTALL_PREFIX}"
+}
+
+build_converters() {
+  if [[ ! -f "${CONVERTER_SOURCE_DIR}/CMakeLists.txt" ]]; then
+    printf 'Converter source directory is missing: %s\n' "${CONVERTER_SOURCE_DIR}" >&2
+    exit 1
+  fi
+
+  build_xsd
+
+  local XSD_EXECUTABLE="${XSD_INSTALL_DIR}/bin/xsd"
+  local XSD_INCLUDE_DIR="${XSD_INSTALL_DIR}/include"
+  local XSD_DIR="${XSD_INSTALL_DIR}"
+
+  local -a converter_cmake_args=(
+    -S "${CONVERTER_SOURCE_DIR}"
+    -B "${CONVERTER_BUILD_DIR}"
+    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+    -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
+    -DCMAKE_PREFIX_PATH="${DEPENDENCY_PREFIX}"
+    -DBOOST_ROOT="${DEPENDENCY_PREFIX}"
+    -DBoost_ROOT="${DEPENDENCY_PREFIX}"
+    -DBoost_USE_STATIC_LIBS=OFF
+    -DBoost_NO_SYSTEM_PATHS=ON
+    -DRPCDIR="${DEPENDENCY_PREFIX}"
+    -DSERIALIZE=Boost
+    -DXML_SUPPORT=ON
+    -DXSD_EXECUTABLE="${XSD_EXECUTABLE}"
+    -Dpercolator-in-namespace=http://per-colator.com/percolator_in/13
+    -Dpercolator-out-namespace=http://per-colator.com/percolator_out/15
+    -DmzIdentML-namespace=http://psidev.info/psi/pi/mzIdentML/1.1
+    -Dgaml_tandem-namespace=http://www.bioml.com/gaml/
+    -Dgaxml_tandem-namespace=http://www.bioml.com/gaml/
+    -Dtandem-namespace=http://www.thegpm.org/TANDEM/2011.12.01.1
+  )
+
+  if [[ -n "${XSD_INCLUDE_DIR}" ]]; then
+    converter_cmake_args+=(-DXSD_INCLUDE_DIR="${XSD_INCLUDE_DIR}")
+  fi
+
+  XSDDIR="${XSD_DIR}" \
+  XERCESCROOT="${DEPENDENCY_PREFIX}" \
+    "${PIXI[@]}" cmake "${converter_cmake_args[@]}"
+  "${PIXI[@]}" cmake --build "${CONVERTER_BUILD_DIR}" --parallel \
+    --target msgf2pin sqt2pin tandem2pin
+  "${PIXI[@]}" cmake --install "${CONVERTER_BUILD_DIR}" --prefix "${INSTALL_PREFIX}"
+
+  for converter_binary in msgf2pin sqt2pin tandem2pin; do
+    if [[ ! -x "${INSTALL_PREFIX}/bin/${converter_binary}" ]]; then
+      printf 'Converter binary was not installed: %s\n' "${INSTALL_PREFIX}/bin/${converter_binary}" >&2
+      exit 1
+    fi
+  done
+}
+
+case "${target}" in
+  all)
+    build_percolator
+    build_converters
+    ;;
+  percolator)
+    build_percolator
+    ;;
+  converters)
+    build_converters
+    ;;
+esac

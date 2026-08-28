@@ -5,9 +5,24 @@ name = "percolator"
 platforms = ["osx-arm64", { platform = "linux-64", glibc = "2.17" }]
 version = "0.1.0"
 
-[tasks]
-clone = "git clone --depth=1 https://github.com/percolator/percolator.git"
-build = "./build.sh"
+[tasks._percolator]
+cmd = "mkdir -p pkg && test -e pkg/percolator/.git/config || git clone --depth=1 https://github.com/percolator/percolator.git pkg/percolator"
+
+[tasks._build2]
+cmd = "tools/build2-toolchain"
+
+[tasks._xsd]
+cmd = "mkdir -p pkg && test -e pkg/xsd/.git/config || git clone --depth=1 --branch master --single-branch https://git.codesynthesis.com/xsd/xsd.git pkg/xsd"
+
+[tasks.clone]
+depends-on = ["_build2", "_percolator", "_xsd"]
+
+[tasks.clean]
+cmd = "rm -rf build pkg/xsd/.bdep"
+
+[tasks.build]
+cmd = "tools/build"
+depends-on = ["clone"]
 
 [dependencies]
 boost-cpp = ">=1.85.0,<2"
@@ -20,5 +35,5 @@ libtirpc = ">=1.3,<2"
 xerces-c = ">=3.2,<4"
 zlib = ">=1.3.2,<2"
 
-[target.linux-64.dependencies]
-xsd = ">=4.0.0_dep,<5"
+[activation.env]
+PATH = "$PIXI_PROJECT_ROOT/tools/bin:$PATH"

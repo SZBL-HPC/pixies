@@ -2,7 +2,9 @@
 .pixi/*
 !.pixi/config.toml
 
-percolator/
+pkg/
+tools/*
+!tools/build2-toolchain
+!tools/build
 build/
 release/
-

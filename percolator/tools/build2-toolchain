@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly PKG_DIR="${ROOT_DIR}/pkg"
+readonly BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
+readonly ARCHIVE="${PKG_DIR}/build2-toolchain-0.18.1.tar.gz"
+readonly SOURCE_DIR="${BUILD_DIR}/build2-toolchain-0.18.1"
+readonly URL="https://download.build2.org/0.18.1/build2-toolchain-0.18.1.tar.gz"
+readonly EXPECTED_SHA256="23b1719f1d8d1ef1954d2363884969ad760ee031b5b1a024c7e0b4913a2125f1"
+
+if command -v b >/dev/null 2>&1 && command -v bdep >/dev/null 2>&1; then
+  exit 0
+fi
+
+if [[ -x "${ROOT_DIR}/tools/bin/b" && -x "${ROOT_DIR}/tools/bin/bdep" ]]; then
+  exit 0
+fi
+
+mkdir -p "${PKG_DIR}" "${BUILD_DIR}"
+if [[ ! -e "${SOURCE_DIR}/build2/bootstrap.sh" ]]; then
+  if [[ ! -f "${ARCHIVE}" ]]; then
+    curl --location --fail --retry 3 --output "${ARCHIVE}" "${URL}"
+  fi
+
+  actual_sha256="$(python -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "${ARCHIVE}")"
+  if [[ "${actual_sha256}" != "${EXPECTED_SHA256}" ]]; then
+    printf 'Invalid SHA256 for %s: %s\n' "${ARCHIVE}" "${actual_sha256}" >&2
+    exit 1
+  fi
+
+  rm -rf "${SOURCE_DIR}"
+  tar -xzf "${ARCHIVE}" -C "${BUILD_DIR}"
+fi
+
+if [[ ! -e "${SOURCE_DIR}/build2/bootstrap.sh" ]]; then
+  printf 'build2 toolchain source is incomplete: %s\n' "${SOURCE_DIR}" >&2
+  exit 1
+fi
