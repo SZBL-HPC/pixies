@@ -1,0 +1,37 @@
+[workspace]
+authors = ["HU Xuesong <87519979+huxs001@users.noreply.github.com>"]
+channels = ["conda-forge", "bioconda"]
+name = "gromacs"
+platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }]
+version = "0.1.0"
+
+[tasks]
+
+[tasks._d_plumed]
+cmd = "mkdir -p pkg && curl -L -C - -o pkg/plumed-src-2.10.1.tgz https://github.com/plumed/plumed2/releases/download/v2.10.1/plumed-src-2.10.1.tgz"
+outputs = ["pkg/plumed-src-2.10.1.tgz"]
+
+[tasks._d_gromacs]
+cmd = "mkdir -p pkg && curl -L -C - -o pkg/gromacs-2025.5.tar.gz https://ftp.gromacs.org/gromacs/gromacs-2025.5.tar.gz"
+outputs = ["pkg/gromacs-2025.5.tar.gz"]
+
+[tasks._mk_plumed]
+depends-on = ["_d_plumed"]
+cmd = "tar -xf pkg/plumed-src-2.10.1.tgz && cd plumed-2.10.1 && ./configure --prefix=\"$(pwd)/../local\" && make install"
+
+[tasks.down]
+depends-on = ["_d_plumed", "_d_gromacs"]
+
+[activation.env]
+PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH"
+
+[dependencies]
+compilers = ">=2.0.0,<3"
+cmake = ">=4.4.3,<5"
+make = ">=4.4.1,<5"
+patch = ">=2.8,<3"
+openmpi = ">=5.0.10,<6"
+python = ">=3.14.7,<3.15"
+pip = ">=26.2.1,<27"
+setuptools = ">=84.0.0,<85"
+cython = ">=3.3.0,<4"

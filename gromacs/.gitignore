@@ -1,0 +1,7 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+pkg/
+local/
+plumed-2.10.1/
