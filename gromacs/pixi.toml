@@ -2,7 +2,7 @@
 authors = ["HU Xuesong <87519979+huxs001@users.noreply.github.com>"]
 channels = ["conda-forge", "bioconda"]
 name = "gromacs"
-platforms = ["osx-arm64", "linux-64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }]
+platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }]
 version = "0.1.0"
 
 [tasks]
@@ -12,8 +12,8 @@ cmd = "mkdir -p pkg && curl -L -C - -o pkg/plumed-src-2.10.1.tgz https://github.
 outputs = ["pkg/plumed-src-2.10.1.tgz"]
 
 [tasks._d_gromacs]
-cmd = "mkdir -p pkg && curl -L -C - -o pkg/gromacs-2025.5.tar.gz https://ftp.gromacs.org/gromacs/gromacs-2025.5.tar.gz"
-outputs = ["pkg/gromacs-2025.5.tar.gz"]
+cmd = "mkdir -p pkg && curl -L -C - -o pkg/gromacs-2023.5.tar.gz https://ftp.gromacs.org/gromacs/gromacs-2023.5.tar.gz"
+outputs = ["pkg/gromacs-2023.5.tar.gz"]
 
 [tasks._mk_plumed]
 depends-on = ["_d_plumed"]
@@ -22,13 +22,13 @@ outputs = ["local/bin/plumed", "local/bin/plumed-patch"]
 
 [tasks._p_gromacs]
 depends-on = ["_d_gromacs"]
-cmd = "tar -xf pkg/gromacs-2025.5.tar.gz && cd gromacs-2025.5 && plumed-patch -e gromacs-2025.0 -p"
-outputs = ["gromacs-2025.5/src/gromacs/mdrun/runner.cpp.preplumed"]
+cmd = "tar -xf pkg/gromacs-2023.5.tar.gz && cd gromacs-2023.5 && plumed-patch -e gromacs-2023.5 -p"
+outputs = ["gromacs-2023.5/src/gromacs/mdrun/runner.cpp.preplumed"]
 
 [tasks._mk_gromacs]
 depends-on = ["_p_gromacs", "_mk_plumed"]
-cmd = "mkdir -p gromacs-2025.5/build && cd gromacs-2025.5/build && cmake .. $DGROMACS && make -j && make install"
-outputs = ["local/bin/gmx_mpi", "gromacs-2025.5/build/bin/gmx_mpi"]
+cmd = "mkdir -p gromacs-2023.5/build && cd gromacs-2023.5/build && cmake .. $DGROMACS && make -j && make install"
+outputs = ["local/bin/gmx_mpi", "gromacs-2023.5/build/bin/gmx_mpi"]
 
 [tasks.down]
 depends-on = ["_d_plumed", "_d_gromacs"]
@@ -42,6 +42,7 @@ scripts = ["local/bin/GMXRC.bash"]
 
 [target.osx-arm64.activation.env]
 DGROMACS = "-DGMX_GPU=OpenCL -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local"
+FI_PROVIDER = "tcp"
 
 [target.linux-64.activation.env]
 DGROMACS = "-DGMX_GPU=CUDA -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local"
@@ -49,7 +50,7 @@ GMX_FORCE_GPU_AWARE_MPI = "1"
 
 [dependencies]
 compilers = ">=1.10.0,<3"
-cmake = ">=4.4.3,<5"
+cmake = ">=3.18.4,<4"
 make = ">=4.4.1,<5"
 patch = ">=2.8,<3"
 pip = ">=26.2.1,<27"
@@ -60,6 +61,7 @@ fftw = { build = "mpi_*", version = ">=3.3,<4" }
 
 [target.osx-arm64.dependencies]
 mpich = ">=5.0.1,<6"
+khronos-opencl-icd-loader = ">=2024.10.24,<2025"
 
 [target.linux-64.dependencies]
 openmpi = ">=5.0.8,<6"
