@@ -17,16 +17,35 @@ outputs = ["pkg/gromacs-2025.5.tar.gz"]
 
 [tasks._mk_plumed]
 depends-on = ["_d_plumed"]
-cmd = "tar -xf pkg/plumed-src-2.10.1.tgz && cd plumed-2.10.1 && ./configure --prefix=\"$(pwd)/../local\" && make install"
+cmd = "tar -xf pkg/plumed-src-2.10.1.tgz && cd plumed-2.10.1 && ./configure --prefix=\"$(pwd)/../local\" && make install && rm src/include/plumed"
+outputs = ["local/bin/plumed", "local/bin/plumed-patch"]
+
+[tasks._p_gromacs]
+depends-on = ["_d_gromacs"]
+cmd = "tar -xf pkg/gromacs-2025.5.tar.gz && cd gromacs-2025.5 && plumed-patch -e gromacs-2025.0 -p"
+outputs = ["gromacs-2025.5/src/gromacs/mdrun/runner.cpp.preplumed"]
+
+[tasks._mk_gromacs]
+depends-on = ["_p_gromacs", "_mk_plumed"]
+cmd = "mkdir -p gromacs-2025.5/build && cd gromacs-2025.5/build && cmake .. $DGROMACS && make -j && make install"
+outputs = ["local/bin/gmx_mpi", "gromacs-2025.5/build/bin/gmx_mpi"]
 
 [tasks.down]
 depends-on = ["_d_plumed", "_d_gromacs"]
 
-[activation.env]
-PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH"
+[tasks.build]
+depends-on = ["_mk_plumed", "_mk_gromacs"]
 
 [activation]
+env = { PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH" }
 scripts = ["local/bin/GMXRC.bash"]
+
+[target.osx-arm64.activation.env]
+DGROMACS = "-DGMX_GPU=OpenCL -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local"
+
+[target.linux-64.activation.env]
+DGROMACS = "-DGMX_GPU=CUDA -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local"
+GMX_FORCE_GPU_AWARE_MPI = "1"
 
 [dependencies]
 compilers = ">=1.10.0,<3"
