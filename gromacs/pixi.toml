@@ -2,7 +2,7 @@
 authors = ["HU Xuesong <87519979+huxs001@users.noreply.github.com>"]
 channels = ["conda-forge", "bioconda"]
 name = "gromacs"
-platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }]
+platforms = ["osx-arm64", "linux-64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }]
 version = "0.1.0"
 
 [tasks]
@@ -25,13 +25,26 @@ depends-on = ["_d_plumed", "_d_gromacs"]
 [activation.env]
 PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH"
 
+[activation]
+scripts = ["local/bin/GMXRC.bash"]
+
 [dependencies]
-compilers = ">=2.0.0,<3"
+compilers = ">=1.10.0,<3"
 cmake = ">=4.4.3,<5"
 make = ">=4.4.1,<5"
 patch = ">=2.8,<3"
-openmpi = ">=5.0.10,<6"
-python = ">=3.14.7,<3.15"
 pip = ">=26.2.1,<27"
 setuptools = ">=84.0.0,<85"
 cython = ">=3.3.0,<4"
+pkg-config = ">=0.29.2,<0.30"
+fftw = { build = "mpi_*", version = ">=3.3,<4" }
+
+[target.osx-arm64.dependencies]
+mpich = ">=5.0.1,<6"
+
+[target.linux-64.dependencies]
+openmpi = ">=5.0.8,<6"
+cuda-compiler = ">=12.4,<14"
+cuda-libraries = ">=12.4,<14"
+cuda-libraries-dev = ">=12.4,<14"
+cuda-nvml-dev = ">=12.4,<14"
