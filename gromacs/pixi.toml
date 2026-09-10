@@ -49,7 +49,7 @@ depends-on = ["_mk_plumed", "_mk_gromacs", "_mk_gromacs_d"]
 [activation]
 env = {
     PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH",
-    DGROMACS0 = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local",
+    DGROMACS0 = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local",
     CXXFLAGS = "-Wno-missing-include-dirs -Wno-deprecated-literal-operator -Wno-deprecated-declarations -Wno-switch-default"
 }
 scripts = ["local/bin/GMXRC.bash"]
