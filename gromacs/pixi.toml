@@ -17,7 +17,7 @@ outputs = ["pkg/gromacs-2023.5.tar.gz"]
 
 [tasks._mk_plumed]
 depends-on = ["_d_plumed"]
-cmd = "tar -xf pkg/plumed-src-2.10.1.tgz && cd plumed-2.10.1 && ./configure --prefix=\"$(pwd)/../local\" && make install && rm src/include/plumed"
+cmd = "test -f local/bin/plumed-patch || ( tar -xf pkg/plumed-src-2.10.1.tgz && cd plumed-2.10.1 && ./configure --prefix=\"$(pwd)/../local\" && make install && rm src/include/plumed )"
 outputs = ["local/bin/plumed", "local/bin/plumed-patch"]
 
 [tasks._p_gromacs]
@@ -27,35 +27,52 @@ outputs = ["gromacs-2023.5/src/gromacs/mdrun/runner.cpp.preplumed"]
 
 [tasks._mk_gromacs]
 depends-on = ["_p_gromacs", "_mk_plumed"]
-cmd = "mkdir -p gromacs-2023.5/build && cd gromacs-2023.5/build && cmake .. $DGROMACS0 $DGROMACS1 $DGROMACS2 && make -j && make install"
+cmd = "mkdir -p gromacs-2023.5/build && cd gromacs-2023.5/build && cmake --fresh .. $DGROMACS0 $DGROMACS1 $DGROMACS2 && make && make install"
 outputs = ["local/bin/gmx_mpi", "gromacs-2023.5/build/bin/gmx_mpi"]
+
+[tasks._mk_gromacs_d]
+depends-on = ["_p_gromacs", "_mk_plumed"]
+cmd = "mkdir -p gromacs-2023.5/build_d && cd gromacs-2023.5/build_d && cmake --fresh .. $DGROMACS0 -DGMX_GPU=OFF -DGMX_DOUBLE=ON $DGROMACS2 && make && make install"
+outputs = ["local/bin/gmx_mpi_d", "gromacs-2023.5/build_d/bin/gmx_mpi_d"]
+
+[target.linux-64.tasks.mk_gromacs_ocl]
+depends-on = ["_p_gromacs", "_mk_plumed"]
+cmd = "mkdir -p gromacs-2023.5/build_ocl && cd gromacs-2023.5/build_ocl && cmake --fresh .. $DGROMACS0 -DGMX_GPU=OpenCL $DGROMACS2 $DGROMACS3 && make && make install"
+outputs = ["local/bin/gmx_mpi_ocl", "gromacs-2023.5/build_ocl/bin/gmx_mpi_ocl"]
 
 [tasks.down]
 depends-on = ["_d_plumed", "_d_gromacs"]
 
 [tasks.build]
-depends-on = ["_mk_plumed", "_mk_gromacs"]
+depends-on = ["_mk_plumed", "_mk_gromacs", "_mk_gromacs_d"]
 
 [activation]
 env = {
     PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH",
-    DGROMACS0 = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local"
+    DGROMACS0 = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local",
+    CXXFLAGS = "-Wno-missing-include-dirs -Wno-deprecated-literal-operator -Wno-deprecated-declarations -Wno-switch-default"
 }
 scripts = ["local/bin/GMXRC.bash"]
 
 [target.osx-arm64.activation.env]
+MAKEFLAGS = "-j4"
 DGROMACS1 = "-DGMX_GPU=OpenCL -DGMX_DOUBLE=OFF"
-DGROMACS2 = ""
+DGROMACS2 = """ \
+-DOpenCL_INCLUDE_DIR=$PIXI_PROJECT_ROOT/.pixi/envs/default/include \
+-DOpenCL_LIBRARY=$PIXI_PROJECT_ROOT/.pixi/envs/default/lib/libOpenCL.dylib \
+"""
 FI_PROVIDER = "tcp"
 
 [target.linux-64.activation.env]
+MAKEFLAGS = "-j8"
 LD_LIBRARY_PATH = "$PIXI_PROJECT_ROOT/local/lib:$LD_LIBRARY_PATH"
 DGROMACS1 = "-DGMX_GPU=CUDA"
-DGROMACS2 = """
+DGROMACS2 = """ \
 -DCMAKE_INSTALL_LIBDIR=lib \
 -DCUDA_NVCC_EXECUTABLE=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc \
--DCMAKE_CUDA_COMPILER=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc
+-DCMAKE_CUDA_COMPILER=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc \
 """
+DGROMACS3 = "-DGMX_DEFAULT_SUFFIX=OFF -DGMX_BINARY_SUFFIX=_mpi_ocl -DGMX_LIBS_SUFFIX=_mpi_ocl"
 GMX_FORCE_GPU_AWARE_MPI = "1"
 
 [dependencies]
