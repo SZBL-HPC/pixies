@@ -57,15 +57,38 @@ mpi5:    gmx_mpi、libgromacs_mpi
 mpis:    gmx_ompi、libgromacs_ompi
 ```
 
+当前只有 `mpi5` 的 standard 构建保留 GROMACS API。`default`、`mpis` 的 `DGROMACS_Common` 设置 `-DGMXAPI=OFF`，`double` 和 `ocl` variant 也显式设置 `-DGMXAPI=OFF`；因此只有 `mpi5` standard 对应的主库生成 `libgmxapi`、`gmxapi-config.cmake` 和 `resourceassignment.h`。在 macOS 上该主库为 `libgromacs_mpi`，Linux target 则按当前 suffix 可能为 `libgromacs_mpi_ocl`。
+
+`-DGMXAPI=OFF` 会关闭整个 gmxapi，而不只是跳过两个文件；它同时不安装 gmxapi headers、CMake export 和 `libgmxapi`。该 API 若有使用需求，只能从 `mpi5` standard prefix 中使用。
+
+关闭这些构建的原因是它们原本会生成内容不同、但安装路径相同的 gmxapi 文件。`resourceassignment.h` 中的 `GMX_LIB_MPI` 在 default 中为 `0`，在 MPI 构建中为 `1`；`gmxapi-config.cmake` 在 default 中设置 `MPI "none"`，在 MPI 构建中设置 `MPI "library"`。此外，`gmxapi.cmake` 和 CMake export target 会引用实际的库后缀：mpi5 standard 引用 `gromacs_mpi`，mpis 引用 `gromacs_ompi`，mpi5 double 和 OCL 构建还会引用各自的 `_mpi_d` 或 OCL suffix。
+
+这些文件分别安装为共享 prefix 下的 `include/gmxapi/mpi/resourceassignment.h`、`share/cmake/gmxapi/gmxapi-config.cmake` 和 `share/cmake/gmxapi/gmxapi.cmake`，没有按 MPI 或 variant 添加目录后缀。后一次安装会覆盖前一次的配置，导致 gmxapi package metadata 指向错误的 MPI 库。因此现在关闭 default、mpis、double 和 ocl 的 GMXAPI，只让 mpi5 standard 生成与其实际主库 suffix 一致的一组 API 文件。
+
 不过安装清单中仍有共享路径，例如 `bin/GMXRC`、`bin/GMXRC.bash`、`bin/gmx-completion.bash`、`share/gromacs/`、公共 headers、man pages 以及部分无 suffix 的第三方库。这些文件可能被同一版本的后一次 `make install` 重写。因此当前设计可以避免核心 GROMACS 可执行文件和主库因 suffix 发生覆盖，但不能声称安装目录完全独立。
 
 同一版本的不同环境或 `single`/`double` variant 不应并行执行安装步骤。若需要物理上完全隔离的安装产物，应把 prefix 改为 `local/gromacs/{{ version }}/{{ pixi.environment.name }}/`，并相应修改 `switch.sh` 的版本扫描逻辑；当前配置为了保留按版本自动发现功能，选择了共享的版本 prefix。
+
+当前 `default`、`mpis`、`double` 和 `ocl` 构建都设置 `GMXAPI=OFF`，只有 `mpi5` standard 构建保留 GMXAPI。因此表格中的 gmxapi 文件差异是关闭 GMXAPI 之前各配置本来会生成的内容，用于说明为什么共享安装 prefix 会发生冲突；现在这些构建不再生成对应文件，潜在覆盖不会发生。
+
+在以下表格中，“文件内容相同”是指使用同一个 GROMACS 版本、相同 GPU/精度/PLUMED 等非 MPI 选项，仅切换 MPI 环境时的情况。关闭 GMXAPI 前，使用当前 CMake 3.31.8 临时 configure 验证：`mpi5` 和 `mpis` 的 `resourceassignment.h` 内容完全相同，均为 `GMX_LIB_MPI=1`；两者的 `gmxapi-config.cmake` 内容也完全相同，均设置 `MPI "library"`。`default` 分别为 `GMX_LIB_MPI=0` 和 `MPI "none"`，因此与两个 MPI 环境不同。
+
+| Pixi environment | MPI 状态 | 文件内容相同 | 文件名不同 | 文件名相同但文件内容不同 |
+| --- | --- | --- | --- | --- |
+| `default` | `GMX_MPI=OFF`、`GMX_THREAD_MPI=OFF`、无 MPI，suffix 为空 | `GMXRC*`、`demux.pl`、`xplor2gmx.pl`、`share/gromacs/` 数据、通用 `gmx-completion.bash`、大部分静态 public headers | `gmx`、`libgromacs`、`gmx-completion-gmx.bash`、无 suffix 的 CMake/pkg-config 目标 | `gmxapi-config.cmake` 设置 `MPI "none"`；`gmxapi.cmake` 和生成的 `gmxapi/mpi/resourceassignment.h` 使用无 MPI 配置 |
+| `mpi5` | `GMX_MPI=ON`、`GMX_THREAD_MPI=OFF`，macOS 使用 MPICH，suffix 为 `_mpi` | 同上；`resourceassignment.h` 和 `gmxapi-config.cmake` 与 `mpis` 相同 | `gmx_mpi`、`libgromacs_mpi`、`gmx-completion-gmx_mpi.bash`、`share/cmake/gromacs_mpi/` 和对应 pkg-config 文件 | `gmxapi-config.cmake` 设置 `MPI "library"`；`gmxapi.cmake` 和相关导出目标引用 `gromacs_mpi`，`resourceassignment.h` 使用 `GMX_LIB_MPI=1` |
+| `mpis` | `GMX_MPI=ON`、`GMX_THREAD_MPI=OFF`，使用 Open MPI，suffix 为 `_ompi` | 同上；`resourceassignment.h` 和 `gmxapi-config.cmake` 与 `mpi5` 相同 | `gmx_ompi`、`libgromacs_ompi`、`gmx-completion-gmx_ompi.bash`、`share/cmake/gromacs_ompi/` 和对应 pkg-config 文件 | `gmxapi-config.cmake` 设置 `MPI "library"`；`gmxapi.cmake` 和相关导出目标引用 `gromacs_ompi`，`resourceassignment.h` 使用 `GMX_LIB_MPI=1` |
+| `double` variant | 继承所在环境的 MPI 状态，suffix 在环境 suffix 后追加 `_d` | `GMXRC*`、拓扑数据、通用 completion 和公共 headers 与对应 standard 构建相同 | `mpi5` 生成 `gmx_mpi_d`、`libgromacs_mpi_d`；`mpis` 生成 `gmx_ompi_d`、`libgromacs_ompi_d`；CMake/pkg-config 目录也使用相应 suffix | 关闭 GMXAPI 前会生成与所在环境 MPI 状态一致的 `gmxapi-config.cmake` 和 `resourceassignment.h`，而 `gmxapi.cmake` 会引用 `_mpi_d` 或 `_ompi_d`；当前 double variant 已关闭 GMXAPI |
+
+因此在关闭 GMXAPI 之前，`default`、`mpi5` 和 `mpis` 的 gmxapi 文件会因内容或 export target 不同而互相覆盖；现在只有 `mpi5` standard 生成这组文件，已经避免了这部分冲突。`GMXRC*`、拓扑数据和通用 completion 仍可能被重写，但通常只是相同内容的覆盖。
+
+CUDA 和 OpenCL 不会改变 `resourceassignment.h` 的 MPI 配置内容；但当前 `ocl` variant 已关闭 gmxapi，因此不会生成这两个文件。GPU 差异仍会体现在 `config.h`、核心库和链接依赖中，不能据此认为 CUDA 和 OpenCL 的整个安装 prefix 可以安全共用。
 
 ## Pixi 激活与 GMXRC
 
 `pixi.toml` 的 `[activation].env` 和 GROMACS 生成的 `GMXRC.bash` 负责不同层次的环境设置。
 
-`[activation].env` 在 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/pixi.toml:134-141` 设置项目级参数：把 `local/bin` 加入 `PATH`，设置 `DGROMACS_Common`、`GMX_SUFFIX` 和编译器 warning flags。`default` 环境在 `:143-145` 覆盖为 `GMX_MPI=OFF`、`GMX_THREAD_MPI=OFF` 和空的 `GMX_SUFFIX`；因此 default 生成 `gmx`，而不是名称带 `_mpi` 的 serial binary。
+`[activation].env` 在 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/pixi.toml:134-141` 设置项目级参数：把 `local/bin` 加入 `PATH`，设置 `DGROMACS_Common`、`GMX_SUFFIX` 和编译器 warning flags。`default` 环境在 `:143-145` 覆盖为 `GMX_MPI=OFF`、`GMX_THREAD_MPI=OFF`、`GMXAPI=OFF` 和空的 `GMX_SUFFIX`；因此 default 生成 `gmx`，而不是名称带 `_mpi` 的 serial binary。`mpis` 环境同样关闭 `GMXAPI`，只保留 `mpi5` standard 构建的 gmxapi。
 
 `local/bin/GMXRC.bash` 是 `switch.sh` 链接到当前版本安装目录的 GROMACS 脚本。以 GROMACS 2023.5 为例，它在 `local/gromacs/2023.5/bin/GMXRC.bash:53-72` 设置并导出 `GMXBIN`、`GMXLDLIB`、`GMXMAN`、`GMXDATA`、`GMXTOOLCHAINDIR`、`GROMACS_DIR`、`PATH`、`DYLD_LIBRARY_PATH`、`PKG_CONFIG_PATH` 和 `MANPATH`。
 

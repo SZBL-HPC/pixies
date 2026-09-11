@@ -92,10 +92,12 @@ cmd = """
         $DGROMACS_GPU_Toolchain \
         {% if variant == "double" %} \
         -DGMX_GPU=OFF -DGMX_DOUBLE=ON \
+        -DGMXAPI=OFF \
         -DGMX_BINARY_SUFFIX=${GMX_SUFFIX}_d \
         -DGMX_LIBS_SUFFIX=${GMX_SUFFIX}_d \
         {% elif variant == "ocl" %} \
         -DGMX_GPU=OpenCL \
+        -DGMXAPI=OFF \
         -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
         -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
         {% else %} \
@@ -141,7 +143,7 @@ env = {
 scripts = ["local/bin/GMXRC.bash"]
 
 [environments.default.activation.env]
-DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=OFF -DGMX_HWLOC=ON"
+DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=OFF -DGMX_HWLOC=ON -DGMXAPI=OFF"
 GMX_SUFFIX = ""
 
 [target.osx-arm64.activation.env]
@@ -187,7 +189,7 @@ channels = ["conda-forge/label/mpi-external"]
 dependencies = { fftw = { build = "mpi_*" } }
 
 [feature.mpi-slurm.target.linux-64]
-activation.env = { USE_SLURM = "1" }
+activation.env = { USE_SLURM = "1", DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON -DGMXAPI=OFF" }
 activation.scripts = [ "activate_mpi.sh" ]
 dependencies = { openmpi = { version = ">=5.0.8,<6", build = "external_*" } }
 
@@ -195,6 +197,7 @@ dependencies = { openmpi = { version = ">=5.0.8,<6", build = "external_*" } }
 openmpi = ">=5.0.8,<6"
 
 [feature.mpi-slurm.target.osx-arm64.activation.env]
+DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON -DGMXAPI=OFF"
 GMX_SUFFIX = "_ompi"
 
 [feature.mpi.target.linux-64.dependencies]
