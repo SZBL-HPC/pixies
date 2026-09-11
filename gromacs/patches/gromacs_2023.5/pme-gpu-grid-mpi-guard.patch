@@ -1,0 +1,13 @@
+diff --git a/src/gromacs/ewald/pme_gpu_grid.cu b/src/gromacs/ewald/pme_gpu_grid.cu
+--- a/src/gromacs/ewald/pme_gpu_grid.cu
++++ b/src/gromacs/ewald/pme_gpu_grid.cu
+@@ -801,4 +801,5 @@ static void receiveAndSend(DeviceBuffer<float> sendBuf,
+                             MPI_Comm            comm)
+ {
+     // send data to dest rank and recv from src rank
++#if GMX_MPI
+     MPI_Irecv(recvBuf, recvCount, MPI_FLOAT, src, tag, comm, recvRequest);
+@@ -808,2 +809,3 @@ static void receiveAndSend(DeviceBuffer<float> sendBuf,
+     MPI_Isend(sendBuf, sendCount, MPI_FLOAT, dest, tag, comm, sendRequest);
++#endif
+ }

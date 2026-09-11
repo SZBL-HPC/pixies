@@ -68,7 +68,10 @@ cmd = """
         ) \
         && cd "$gromacs_dir" \
         && "$plumed_prefix/bin/plumed-patch" -e gromacs-{{ version }} -p \
-    ) )
+    ) ) \
+    && sh "$PIXI_PROJECT_ROOT/patches/apply_patches.sh" \
+        "$PIXI_PROJECT_ROOT/patches/gromacs_{{ version }}" \
+        "$gromacs_dir"
 """
 outputs = [
     "gromacs-{{ version }}/{{ pixi.environment.name }}/src/gromacs/mdrun/runner.cpp.preplumed",
