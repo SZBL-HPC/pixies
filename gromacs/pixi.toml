@@ -27,15 +27,24 @@ outputs = ["pkg/gromacs-{{ version }}.tar.gz"]
 [tasks._mk_plumed]
 depends-on = ["_d_plumed"]
 cmd = """
-    test -f local/bin/plumed-patch || ( \
-        tar -xf pkg/plumed-src-2.10.1.tgz \
-        && cd plumed-2.10.1 \
-        && ./configure --prefix=\"$(pwd)/../local\" \
-        && make install \
-        && rm src/include/plumed \
-    )
+    plumed_dir="plumed-2.10.1/{{ pixi.environment.name }}" \
+    && plumed_prefix="$PIXI_PROJECT_ROOT/local/plumed/{{ pixi.environment.name }}" \
+    && rm -rf "$plumed_dir" \
+    && mkdir -p "$plumed_dir" \
+    && tar -xf pkg/plumed-src-2.10.1.tgz \
+        --strip-components=1 \
+        --exclude='plumed-2.10.1/src/include/plumed' \
+        -C "$plumed_dir" \
+    && cd "$plumed_dir" \
+    && ./configure --prefix="$plumed_prefix" --disable-python --disable-pycv \
+    && make -C src install \
+    && rm -rf src/include/plumed
 """
-outputs = ["local/bin/plumed", "local/bin/plumed-patch"]
+outputs = [
+    "local/plumed/{{ pixi.environment.name }}/bin/plumed",
+    "local/plumed/{{ pixi.environment.name }}/bin/plumed-config",
+    "local/plumed/{{ pixi.environment.name }}/bin/plumed-patch",
+]
 
 [tasks._p_gromacs]
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
@@ -44,11 +53,20 @@ depends-on = [
     "_mk_plumed",
 ] # 必须确保 plumed 先编译完成并生成了 patch 工具
 cmd = """
-    test -d gromacs-{{ version }} || tar -xf pkg/gromacs-{{ version }}.tar.gz \
-    && cd gromacs-{{ version }} \
-    && plumed-patch -e gromacs-{{ version }} -p
+    gromacs_dir="gromacs-{{ version }}/{{ pixi.environment.name }}" \
+    && plumed_prefix="$PIXI_PROJECT_ROOT/local/plumed/{{ pixi.environment.name }}" \
+    && ( test -f "$gromacs_dir/src/gromacs/mdrun/runner.cpp.preplumed" || ( \
+        test -d "$gromacs_dir" || ( \
+            mkdir -p "$gromacs_dir" \
+            && tar -xf pkg/gromacs-{{ version }}.tar.gz --strip-components=1 -C "$gromacs_dir" \
+        ) \
+        && cd "$gromacs_dir" \
+        && "$plumed_prefix/bin/plumed-patch" -e gromacs-{{ version }} -p \
+    ) )
 """
-outputs = ["gromacs-{{ version }}/src/gromacs/mdrun/runner.cpp.preplumed"]
+outputs = [
+    "gromacs-{{ version }}/{{ pixi.environment.name }}/src/gromacs/mdrun/runner.cpp.preplumed",
+]
 
 [tasks._mk_gromacs]
 args = [
@@ -60,32 +78,34 @@ depends-on = [
     "_mk_plumed",
 ]
 cmd = """
-    mkdir -p gromacs-{{ version }}/build_{{ variant }} \
-    && cd gromacs-{{ version }}/build_{{ variant }} \
+    gromacs_dir="gromacs-{{ version }}/{{ pixi.environment.name }}" \
+    && mkdir -p "$PIXI_PROJECT_ROOT/local/gromacs/{{ version }}" \
+    && mkdir -p "$gromacs_dir/build_{{ variant }}" \
+    && cd "$gromacs_dir/build_{{ variant }}" \
     && cmake --fresh .. \
         $DGROMACS_Common \
         -DGMX_DEFAULT_SUFFIX=OFF \
         $DGROMACS_GPU_Toolchain \
-        {% if variant == "double" %}
+        {% if variant == "double" %} \
         -DGMX_GPU=OFF -DGMX_DOUBLE=ON \
         -DGMX_BINARY_SUFFIX=${GMX_SUFFIX}_d \
         -DGMX_LIBS_SUFFIX=${GMX_SUFFIX}_d \
-        {% elif variant == "ocl" %}
+        {% elif variant == "ocl" %} \
         -DGMX_GPU=OpenCL \
         -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
         -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
-        {% else %}
+        {% else %} \
         $DGROMACS_GPU \
         -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
         -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
-        {% endif %}
-        -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local/{{ version }} \
+        {% endif %} \
+        -DCMAKE_INSTALL_PREFIX="$PIXI_PROJECT_ROOT/local/gromacs/{{ version }}" \
     && make \
     && make install
 """
 outputs = [
-    "local/{{ version }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
-    "gromacs-{{ version }}/build_{{ variant }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
+    "local/gromacs/{{ version }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
+    "gromacs-{{ version }}/{{ pixi.environment.name }}/build_{{ variant }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
 ]
 
 [target.linux-64.tasks.mk_gromacs_ocl]
@@ -124,6 +144,8 @@ DGROMACS_GPU_Toolchain = """ \
 -DOpenCL_LIBRARY=$CONDA_PREFIX/lib/libOpenCL.dylib \
 """
 FI_PROVIDER = "tcp"
+CC = "/usr/bin/clang"
+CXX = "/usr/bin/clang++"
 
 [target.linux-64.activation.env]
 MAKEFLAGS = "-j8"
@@ -150,6 +172,7 @@ pkg-config = ">=0.29.2,<0.30"
 fftw = ">=3.3,<4"
 libhwloc = ">=2.12.2,<3"
 pocl = ">=7.1,<8"
+gsl = ">=2.8,<3"
 
 [feature.mpi-slurm]
 channels = ["conda-forge/label/mpi-external"]

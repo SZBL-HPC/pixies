@@ -9,7 +9,8 @@
 ## GROMACS 版本参数
 
 构建 task 的第一个参数是 GROMACS 版本，当前支持 `2023.5`、`2024.6`、`2025.5` 和 `2026.3`。
-版本参数会同时传递给下载、PLUMED patch、标准构建和 double-precision 构建，下载包、源码目录、build 目录、安装前缀和 task `outputs` 都按版本隔离。
+版本参数会同时传递给下载、PLUMED patch、标准构建和 double-precision 构建。
+PLUMED 和 GROMACS 的源码/build 目录按 Pixi 环境隔离，GROMACS 安装前缀按版本组织，task `outputs` 按环境、版本和 variant 隔离。
 
 `_d_plumed` 使用 `curl -L -C -` 下载 `plumed-src-2.10.1.tgz` 到 `pkg/`。
 
@@ -17,12 +18,13 @@
 
 `down` 依赖 `_d_plumed` 和 `_d_gromacs`。
 
-`_mk_plumed` 解压 PLUMED 2.10.1，执行 `./configure --prefix="$(pwd)/../local" && make install`，并生成 `local/bin/plumed` 和 `local/bin/plumed-patch`。
+`_mk_plumed` 将 PLUMED 2.10.1 解压到 `plumed-2.10.1/{{ pixi.environment.name }}/`，执行 `./configure --disable-python --disable-pycv` 和 `make -C src install`，并安装到 `local/plumed/{{ pixi.environment.name }}/`。
+解压时会排除 archive 中会触发 Pixi 循环遍历错误的 `src/include/plumed -> ../` 符号链接。
 
-`_p_gromacs` 解压 `gromacs-{{ version }}`，并执行 `plumed-patch -e gromacs-{{ version }} -p`。
+`_p_gromacs` 将 `gromacs-{{ version }}` 解压到 `gromacs-{{ version }}/{{ pixi.environment.name }}/`，并使用当前环境的 `local/plumed/{{ pixi.environment.name }}/bin/plumed-patch` 执行 patch。
 
 `_mk_gromacs` 接收第二个参数 `variant`，可取 `single`、`double` 或 `ocl`。
-它分别在 `gromacs-{{ version }}/build_single`、`gromacs-{{ version }}/build_double` 或 `gromacs-{{ version }}/build_ocl` 中执行 CMake、并行编译和安装到 `local/{{ version }}/`。
+它分别在 `gromacs-{{ version }}/{{ pixi.environment.name }}/build_single`、`build_double` 或 `build_ocl` 中执行 CMake、并行编译和安装到 `local/gromacs/{{ version }}/`。
 
 `build` 对同一个 `_mk_gromacs` task 分别传入 `single` 和 `double` 两个 `variant`；Linux 的 `mk_gromacs_ocl` 则直接调用 `_mk_gromacs` 的 `ocl` variant。
 
@@ -58,18 +60,20 @@ pixi run build 2026.3
 `gpu-linux-64` 是带 CUDA `12.4` 和 glibc `2.17` 约束的 Linux target；`centos75` 是带 glibc `2.17` 和 Linux `3.10` 约束的 Linux target。
 两个 Linux target 都匹配 `target.linux-64.activation.env` 和 `target.linux-64.dependencies`，因此当前都使用 CUDA、Open MPI 和相同的 CUDA 依赖；差异只在 Pixi 的虚拟平台约束。
 
-`_mk_gromacs` 的 task `outputs` 是按版本、`variant` 和 MPI suffix 展开的 `local/{{ version }}/bin/gmx{{ GMX_SUFFIX }}`；`double` variant 会在 suffix 后追加 `_d`。
-Linux 专用的 `mk_gromacs_ocl` 输出位于 `local/{{ version }}/bin/gmx{{ GMX_SUFFIX }}` 和对应的 `build_ocl/bin/`。
+`_mk_gromacs` 的 task `outputs` 是按环境、版本、`variant` 和 MPI suffix 展开的 `local/gromacs/{{ version }}/bin/gmx{{ GMX_SUFFIX }}`；`double` variant 会在 suffix 后追加 `_d`。
+Linux 专用的 `mk_gromacs_ocl` 输出位于 `local/gromacs/{{ version }}/bin/gmx{{ GMX_SUFFIX }}` 和对应环境的 `build_ocl/bin/`。
 
 macOS 的 `mpi5` 环境使用 MPICH 和 `_mpi` suffix；`mpis` 环境使用 Open MPI，并将 standard/double 构建的 suffix 改为 `_ompi`/`_ompi_d`，避免多个 MPI 版本共用文件名。
 
-安装某个版本后，用 `switch-gromacs.sh` 选择 `GMXRC` 和 `GMXRC.bash`：
+安装后，用 `switch.sh` 选择 GROMACS 版本和 PLUMED 环境：
 
 ```bash
-./switch-gromacs.sh 2023.5
+./switch.sh gromacs 2023.5
+./switch.sh plumed mpi5
+./switch.sh --list
 ```
 
-脚本会把 `local/bin/GMXRC` 和 `local/bin/GMXRC.bash` 链接到所选版本的 `local/<version>/bin/`。
+脚本会把 `local/bin/GMXRC` 和 `local/bin/GMXRC.bash` 链接到所选版本的 `local/gromacs/<version>/bin/`，并把 `plumed`、`plumed-config`、`plumed-patch` 链接到所选环境的 `local/plumed/<environment>/bin/`。
 Pixi activation 继续加载 `local/bin/GMXRC.bash`，手工使用时可以执行 `source local/bin/GMXRC`。
 
 macOS `osx-arm64` 当前使用：
@@ -103,7 +107,7 @@ Linux 专用的 `mk_gromacs_ocl` 会覆盖 GPU 后端为 OpenCL，并额外使�
 ```text
 -DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON
 -DGMX_HWLOC=ON
--DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local/{{ version }}
+-DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local/gromacs/{{ version }}
 ```
 
 Pixi task 内的 `cmake .. $DGROMACS_Common $DGROMACS_GPU $DGROMACS_GPU_Toolchain` 会显式设置 `GMX_DEFAULT_SUFFIX=OFF`，并由 `$GMX_SUFFIX` 生成 `GMX_BINARY_SUFFIX` 和 `GMX_LIBS_SUFFIX`；double variant 会在该 suffix 后再追加 `_d`。
@@ -111,7 +115,7 @@ Pixi task 内的 `cmake .. $DGROMACS_Common $DGROMACS_GPU $DGROMACS_GPU_Toolchai
 在 build 目录手工重新配置时，必须让变量在 Pixi shell 中展开：
 
 ```bash
-cd /Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/build
+cd /Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/mpi5/build_single
 pixi run sh -c 'cmake .. $DGROMACS_Common $DGROMACS_GPU $DGROMACS_GPU_Toolchain'
 ```
 
@@ -125,7 +129,7 @@ pixi run cmake --build . --parallel 2
 
 切换 GROMACS 版本或大幅切换 CMake 选项时，建议使用新的 build 目录，避免旧 `CMakeCache.txt` 保留旧源码路径、安装前缀或编译选项。
 
-当前 macOS GROMACS 2023.5 的标准 build 关键配置为 `GMX_GPU=OpenCL`、`GMX_DOUBLE=OFF`、`GMX_MPI=ON`、`GMX_HWLOC=ON`、`GMX_OPENMP=ON` 和 `GMX_THREAD_MPI=OFF`，安装前缀为 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/local/2023.5`；`mpi5` 生成 `gmx_mpi`，`mpis` 生成 `gmx_ompi`。
+当前 macOS GROMACS 2023.5 的标准 build 关键配置为 `GMX_GPU=OpenCL`、`GMX_DOUBLE=OFF`、`GMX_MPI=ON`、`GMX_HWLOC=ON`、`GMX_OPENMP=ON` 和 `GMX_THREAD_MPI=OFF`，安装前缀为 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/local/gromacs/2023.5`；`mpi5` 生成 `gmx_mpi`，`mpis` 生成 `gmx_ompi`。
 
 ## HWLOC 与 double precision
 
@@ -234,7 +238,7 @@ OMP_NUM_THREADS=8 mpirun -np 4 gmx_mpi mdrun -ntomp 8
 
 ## 构建输出诊断
 
-在 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/build` 执行 `pixi run make -j2` 后，构建已到 `[100%]`，`libgromacs`、`gmxapi`、`gmx` 和 `nblib` 均已成功生成。
+在 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/mpi5/build_single` 执行 `pixi run make -j2` 后，构建已到 `[100%]`，`libgromacs`、`gmxapi`、`gmx` 和 `nblib` 均已成功生成。
 
 并行构建时输出会交错，容易把 warning 看成 error；排查时可以使用串行构建：
 
@@ -263,11 +267,11 @@ pixi run cmake --build . --parallel 1 2>&1 | tee make.log
 PLUMED 2.10 官方的 GROMACS 2025.0 patch 页面是：
 `https://www.plumed.org/doc-v2.10/user-doc/html/gromacs-2025-0.html`。
 
-用 `gromacs-2025.0` patch 处理 GROMACS 2025.5 时，`local/lib/plumed/patches/gromacs-2025.0.diff/src/gromacs/CMakeLists.txt` 的 hunk 没有打上并不必然是问题。
+用 `gromacs-2025.0` patch 处理 GROMACS 2025.5 时，`local/plumed/mpi5/lib/plumed/patches/gromacs-2025.0.diff/src/gromacs/CMakeLists.txt` 的 hunk 没有打上并不必然是问题。
 
 干净源码测试显示，GROMACS 2025.5 上游已经包含该 CMake hunk 的结构，因此 patch 会报告 `Ignoring previously applied (or reversed) patch`，而其他 PLUMED 相关 hunk 可以应用。
 
-但 patch 过程出现 `.rej` 仍必须检查，因为 `local/lib/plumed/scripts/patch.sh` 没有用 `set -e`，部分 patch reject 不一定会让 task 失败。
+但 patch 过程出现 `.rej` 仍必须检查，因为 `local/plumed/mpi5/lib/plumed/scripts/patch.sh` 没有用 `set -e`，部分 patch reject 不一定会让 task 失败。
 
 当前配置改用 GROMACS 2023.5，并使用同版本的 `plumed-patch -e gromacs-2023.5 -p`，这是更稳妥的组合。
 
@@ -276,7 +280,7 @@ PLUMED 2.10 官方的 GROMACS 2025.0 patch 页面是：
 运行指定测试：
 
 ```bash
-cd /Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/build
+cd /Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/mpi5/build_single
 pixi run ctest --output-on-failure -R '^MdrunOutputTests$'
 ```
 
@@ -306,7 +310,7 @@ pixi run ./bin/mdrun-output-test \
 
 ## MPI Runtime
 
-构建生成的 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/build/bin/gmx_mpi` 会报告：
+构建生成的 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/local/gromacs/2023.5/bin/gmx_mpi` 会报告：
 
 ```text
 GROMACS version: 2023.5-plumed_2.10.1
