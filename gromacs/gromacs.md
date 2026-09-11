@@ -11,6 +11,7 @@
 构建 task 的第一个参数是 GROMACS 版本，当前支持 `2023.5`、`2024.6`、`2025.5` 和 `2026.3`。
 版本参数会同时传递给下载、PLUMED patch、标准构建和 double-precision 构建。
 PLUMED 和 GROMACS 的源码/build 目录按 Pixi 环境隔离，GROMACS 安装前缀按版本组织，task `outputs` 按环境、版本和 variant 隔离。
+PLUMED 的安装目录也按环境隔离；GROMACS 的安装目录目前按版本共享，这是为了让 `switch.sh` 能自动发现版本，并不等于不同 MPI 环境的安装文件完全独立。
 
 `_d_plumed` 使用 `curl -L -C -` 下载 `plumed-src-2.10.1.tgz` 到 `pkg/`。
 
@@ -27,6 +28,67 @@ PLUMED 和 GROMACS 的源码/build 目录按 Pixi 环境隔离，GROMACS 安装�
 它分别在 `gromacs-{{ version }}/{{ pixi.environment.name }}/build_single`、`build_double` 或 `build_ocl` 中执行 CMake、并行编译和安装到 `local/gromacs/{{ version }}/`。
 
 `build` 对同一个 `_mk_gromacs` task 分别传入 `single` 和 `double` 两个 `variant`；Linux 的 `mk_gromacs_ocl` 则直接调用 `_mk_gromacs` 的 `ocl` variant。
+
+## 目录隔离与安装覆盖
+
+PLUMED 的目录按环境完全隔离。以 `mpi5` 为例，源码/build 位于 `plumed-2.10.1/mpi5/`，安装前缀位于 `local/plumed/mpi5/`；`mpis` 和 `default` 使用各自的目录。不同 MPI 环境不会共用 PLUMED 的 configure、对象文件、生成文件或安装库。
+
+GROMACS 的源码和 build 目录也按环境隔离。对于版本 `2023.5`，实际目录是：
+
+```text
+gromacs-2023.5/default/
+gromacs-2023.5/mpi5/
+gromacs-2023.5/mpis/
+```
+
+每个目录下还有独立的 `build_single`、`build_double` 和 Linux 专用的 `build_ocl`。PLUMED patch 产生的 `runner.cpp.preplumed` 也位于对应环境的源码目录中，因此不同环境不会重复 patch 同一份源码。
+
+GROMACS 的安装前缀目前是共享的：
+
+```text
+local/gromacs/2023.5/
+```
+
+`GMX_SUFFIX` 会隔离主要的环境相关文件。当前命名为：
+
+```text
+default: gmx、libgromacs、无 suffix
+mpi5:    gmx_mpi、libgromacs_mpi
+mpis:    gmx_ompi、libgromacs_ompi
+```
+
+不过安装清单中仍有共享路径，例如 `bin/GMXRC`、`bin/GMXRC.bash`、`bin/gmx-completion.bash`、`share/gromacs/`、公共 headers、man pages 以及部分无 suffix 的第三方库。这些文件可能被同一版本的后一次 `make install` 重写。因此当前设计可以避免核心 GROMACS 可执行文件和主库因 suffix 发生覆盖，但不能声称安装目录完全独立。
+
+同一版本的不同环境或 `single`/`double` variant 不应并行执行安装步骤。若需要物理上完全隔离的安装产物，应把 prefix 改为 `local/gromacs/{{ version }}/{{ pixi.environment.name }}/`，并相应修改 `switch.sh` 的版本扫描逻辑；当前配置为了保留按版本自动发现功能，选择了共享的版本 prefix。
+
+## Pixi 激活与 GMXRC
+
+`pixi.toml` 的 `[activation].env` 和 GROMACS 生成的 `GMXRC.bash` 负责不同层次的环境设置。
+
+`[activation].env` 在 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/pixi.toml:134-141` 设置项目级参数：把 `local/bin` 加入 `PATH`，设置 `DGROMACS_Common`、`GMX_SUFFIX` 和编译器 warning flags。`default` 环境在 `:143-145` 覆盖为 `GMX_MPI=OFF`、`GMX_THREAD_MPI=OFF` 和空的 `GMX_SUFFIX`；因此 default 生成 `gmx`，而不是名称带 `_mpi` 的 serial binary。
+
+`local/bin/GMXRC.bash` 是 `switch.sh` 链接到当前版本安装目录的 GROMACS 脚本。以 GROMACS 2023.5 为例，它在 `local/gromacs/2023.5/bin/GMXRC.bash:53-72` 设置并导出 `GMXBIN`、`GMXLDLIB`、`GMXMAN`、`GMXDATA`、`GMXTOOLCHAINDIR`、`GROMACS_DIR`、`PATH`、`DYLD_LIBRARY_PATH`、`PKG_CONFIG_PATH` 和 `MANPATH`。
+
+该脚本还会移除旧 GROMACS 版本的路径，避免切换版本后路径重复，并在支持的 shell 中加载 GROMACS completion。因此 `scripts = ["local/bin/GMXRC.bash"]` 不是对 `[activation].env` 的重复，可以继续保留。
+
+如果删除 `activation.scripts`，Pixi 只会把 `local/bin` 加入 `PATH`，不会自动把 `local/gromacs/<version>/bin` 加入 `PATH`，也不会设置 GROMACS 的运行时库、数据目录、pkg-config 路径和 completion。只有明确要求用户手动 `source local/bin/GMXRC` 时，才可以删除该 activation script。
+
+## PLUMED 配置与依赖
+
+PLUMED 2.10.1 release archive 中包含 `src/include/plumed -> ../` 循环符号链接。Pixi 的 task walker 会跟随该链接，并且不使用 `.gitignore` 过滤，因此 `.gitignore` 和 `pixi run --no-symbolic-links` 都不能解决这个问题。`_mk_plumed` 解包时使用 `tar --exclude='plumed-2.10.1/src/include/plumed'`；删除或不解包该链接不会影响 `configure` 或 `make -C src install`。
+
+PLUMED 的构建只使用 `make -C src install`，并通过 `--disable-python --disable-pycv` 禁止 Python/PyCV；不会进入顶层的 Python 和 Vim 构建目录。无条件的 `make clean` 也没有必要，因为 task cache miss 时会重新解包独立的环境目录，cache hit 时不会执行构建。
+
+PLUMED 2.10.1 对 zlib、GSL 和 FFTW 使用头文件及直接链接检查，不依赖 `pkg-config`。当前配置保留：
+
+```text
+CPPFLAGS=-I$CONDA_PREFIX/include
+LDFLAGS=-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib
+```
+
+`--enable-zlib`、`--enable-gsl` 和 `--enable-fftw` 默认就是开启，显式写出用于记录构建意图。`zlib` 是需要直接声明的开发依赖；GSL 会带入 BLAS provider，当前环境由 OpenBLAS 同时提供 BLAS/LAPACK，因此不需要额外声明 `blas` 或独立的 `lapack` 包。
+
+`--enable-rpath` 保留用于支持该选项的平台；它会尝试把安装目录和 `LIBRARY_PATH` 加入 shared library 的搜索路径。当前 macOS configure 找不到 `readelf`，该自动逻辑不会生效，所以 `LDFLAGS` 中针对 `$CONDA_PREFIX/lib` 的显式 `-Wl,-rpath` 仍必须保留。`LIBRARY_PATH` 不需要再设置为安装 prefix，`-Wl,-rpath-link` 也不加入跨平台公共配置，因为 Apple linker 不支持 GNU linker 的该选项。
 
 从项目根目录执行完整构建：
 

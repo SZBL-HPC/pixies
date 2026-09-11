@@ -140,6 +140,10 @@ env = {
 }
 scripts = ["local/bin/GMXRC.bash"]
 
+[environments.default.activation.env]
+DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=OFF -DGMX_HWLOC=ON"
+GMX_SUFFIX = ""
+
 [target.osx-arm64.activation.env]
 MAKEFLAGS = "-j4"
 DGROMACS_GPU = "-DGMX_GPU=OpenCL -DGMX_DOUBLE=OFF"
