@@ -5,8 +5,6 @@ name = "gromacs"
 platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }, { name = "centos75", platform = "linux-64", glibc = "2.17", linux = "3.10" }, "linux-64"]
 version = "0.1.0"
 
-[tasks]
-
 [tasks._d_plumed]
 cmd = """
     mkdir -p pkg \
@@ -76,6 +74,7 @@ outputs = [
 args = [
     { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
     { arg = "variant", default = "single", choices = ["single", "double", "ocl"] },
+    { arg = "suffix", default = "" },
 ]
 depends-on = [
     { task = "_p_gromacs", args = ["{{ version }}"] },
@@ -88,35 +87,54 @@ cmd = """
     && cd "$gromacs_dir/build_{{ variant }}" \
     && cmake --fresh .. \
         $DGROMACS_Common \
-        -DGMX_DEFAULT_SUFFIX=OFF \
+        {% if pixi.environment.name == "default" %} \
+        -DGMX_MPI=OFF \
+        {% else %} \
+        -DGMX_MPI=ON \
+        {% endif %} \
         $DGROMACS_GPU_Toolchain \
+        {% if pixi.environment.name == "default" or pixi.environment.name == "mpis" or variant == "double" or variant == "ocl" %} \
+        -DGMXAPI=OFF \
+        {% endif %} \
         {% if variant == "double" %} \
         -DGMX_GPU=OFF -DGMX_DOUBLE=ON \
-        -DGMXAPI=OFF \
-        -DGMX_BINARY_SUFFIX=${GMX_SUFFIX}_d \
-        -DGMX_LIBS_SUFFIX=${GMX_SUFFIX}_d \
         {% elif variant == "ocl" %} \
         -DGMX_GPU=OpenCL \
-        -DGMXAPI=OFF \
-        -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
-        -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
         {% else %} \
         $DGROMACS_GPU \
-        -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
-        -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
         {% endif %} \
+        -DGMX_BINARY_SUFFIX={{ suffix }} \
+        -DGMX_LIBS_SUFFIX={{ suffix }} \
         -DCMAKE_INSTALL_PREFIX="$PIXI_PROJECT_ROOT/local/gromacs/{{ version }}" \
     && make \
     && make install
 """
 outputs = [
-    "local/gromacs/{{ version }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
-    "gromacs-{{ version }}/{{ pixi.environment.name }}/build_{{ variant }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
+    # Outputs are templated before activation.env is available; mirror the suffix mapping here.
+    "local/gromacs/{{ version }}/bin/gmx{{ suffix }}",
+    "gromacs-{{ version }}/{{ pixi.environment.name }}/build_{{ variant }}/bin/gmx{{ suffix }}",
 ]
 
-[target.linux-64.tasks.mk_gromacs_ocl]
-args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
-depends-on = [{ task = "_mk_gromacs", args = ["{{ version }}", "ocl"] }]
+[tasks._batch_mk_gromacs]
+args = [
+    { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
+    { arg = "suffix", default = "" },
+]
+depends-on = [
+    { task = "_mk_gromacs", args = ["{{ version }}", "single", "{{ suffix }}"] },
+    { task = "_mk_gromacs", args = ["{{ version }}", "double", "{{ suffix }}_d"] },
+]
+
+[target.linux-64.tasks._batch_mk_gromacs]
+args = [
+    { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
+    { arg = "suffix", default = "" },
+]
+depends-on = [
+    { task = "_mk_gromacs", args = ["{{ version }}", "single", "{{ suffix }}"] },
+    { task = "_mk_gromacs", args = ["{{ version }}", "double", "{{ suffix }}_d"] },
+    { task = "_mk_gromacs", args = ["{{ version }}", "ocl", "{{ suffix }}_ocl"] },
+]
 
 [tasks.down]
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
@@ -129,22 +147,73 @@ depends-on = [
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
 depends-on = [
     "_mk_plumed",
-    { task = "_mk_gromacs", args = ["{{ version }}", "single"] },
-    { task = "_mk_gromacs", args = ["{{ version }}", "double"] },
+    { task = "_batch_mk_gromacs", args = [
+        "{{ version }}",
+        """{%- if pixi.environment.name == "default" -%}
+{%- elif pixi.environment.name == "mpis" and pixi.is_osx -%}
+_ompi
+{%- elif pixi.environment.name == "mpi5" or pixi.environment.name == "mpis" -%}
+_mpi
+{%- endif -%}""",
+    ] },
 ]
 
+[dependencies]
+compilers = ">=1.10.0,<3"
+_openmp_mutex = ">=4.5,<5"
+cmake = ">=3.18.4,<4"
+make = ">=4.4.1,<5"
+patch = ">=2.8,<3"
+pip = ">=26.2.1,<27"
+setuptools = ">=84.0.0,<85"
+cython = ">=3.3.0,<4"
+pkg-config = ">=0.29.2,<0.30"
+fftw = ">=3.3,<4"
+libhwloc = ">=2.12.2,<3"
+pocl = ">=7.1,<8"
+gsl = ">=2.8,<3"
+zlib = ">=1.3,<2"
+
+[target.linux-64.dependencies]
+cuda-compiler = ">=12.4,<14"
+cuda-libraries = ">=12.4,<14"
+cuda-libraries-dev = ">=12.4,<14"
+cuda-nvml-dev = ">=12.4,<14"
+ocl-icd = ">=2.3.4,<3"
+
+[target.osx-arm64.dependencies]
+khronos-opencl-icd-loader = ">=2024.10.24,<2025"
+ocl_icd_wrapper_apple = ">=1.0.0,<2"
+
+[feature.mpi.dependencies]
+fftw = { build = "mpi_*" }
+
+[feature.mpi.target.linux-64.dependencies]
+openmpi = ">=5.0.8,<6"
+
+[feature.mpi.target.osx-arm64.dependencies]
+mpich = ">=5.0.0,<6"
+
+[feature.mpi-slurm]
+channels = ["conda-forge/label/mpi-external"]
+dependencies = { fftw = { build = "mpi_*" }, openmpi = ">=5.0.8,<6" }
+
+[feature.mpi-slurm.target.linux-64.dependencies]
+openmpi = { build = "external_*" }
+
+[environments]
+mpi5 = ["mpi"]
+mpis = ["mpi-slurm"]
+
+# Activation inheritance order:
+# default feature -> target -> feature target -> environment override.
 [activation]
 env = {
     PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH",
-    DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON",
-    GMX_SUFFIX = "_mpi",
+    DGROMACS_Common = "-DGMX_DEFAULT_SUFFIX=OFF -DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_HWLOC=ON",
     CXXFLAGS = "-Wno-missing-include-dirs -Wno-deprecated-literal-operator -Wno-deprecated-declarations -Wno-switch-default"
 }
 scripts = ["local/bin/GMXRC.bash"]
-
-[environments.default.activation.env]
-DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=OFF -DGMX_HWLOC=ON -DGMXAPI=OFF"
-GMX_SUFFIX = ""
 
 [target.osx-arm64.activation.env]
 MAKEFLAGS = "-j4"
@@ -165,60 +234,10 @@ DGROMACS_GPU_Toolchain = """ \
 -DCUDA_NVCC_EXECUTABLE=$CONDA_PREFIX/bin/nvcc \
 -DCMAKE_CUDA_COMPILER=$CONDA_PREFIX/bin/nvcc \
 """
-GMX_SUFFIX = "_mpi_ocl"
+
+[feature.mpi-slurm.target.linux-64.activation]
+scripts = ["activate_mpi.sh"]
+
+[feature.mpi-slurm.target.linux-64.activation.env]
+USE_SLURM = "1"
 GMX_FORCE_GPU_AWARE_MPI = "1"
-
-[dependencies]
-compilers = ">=1.10.0,<3"
-_openmp_mutex = ">=4.5,<5"
-cmake = ">=3.18.4,<4"
-make = ">=4.4.1,<5"
-patch = ">=2.8,<3"
-pip = ">=26.2.1,<27"
-setuptools = ">=84.0.0,<85"
-cython = ">=3.3.0,<4"
-pkg-config = ">=0.29.2,<0.30"
-fftw = ">=3.3,<4"
-libhwloc = ">=2.12.2,<3"
-pocl = ">=7.1,<8"
-gsl = ">=2.8,<3"
-zlib = ">=1.3,<2"
-
-[feature.mpi-slurm]
-channels = ["conda-forge/label/mpi-external"]
-dependencies = { fftw = { build = "mpi_*" } }
-
-[feature.mpi-slurm.target.linux-64]
-activation.env = { USE_SLURM = "1", DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON -DGMXAPI=OFF" }
-activation.scripts = [ "activate_mpi.sh" ]
-dependencies = { openmpi = { version = ">=5.0.8,<6", build = "external_*" } }
-
-[feature.mpi-slurm.target.osx-arm64.dependencies]
-openmpi = ">=5.0.8,<6"
-
-[feature.mpi-slurm.target.osx-arm64.activation.env]
-DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON -DGMXAPI=OFF"
-GMX_SUFFIX = "_ompi"
-
-[feature.mpi.target.linux-64.dependencies]
-openmpi = ">=5.0.8,<6"
-fftw = { build = "mpi_*" }
-
-[feature.mpi.target.osx-arm64.dependencies]
-mpich = ">=5.0.0,<6"
-fftw = { build = "mpi_*" }
-
-[environments]
-mpi5 = ["mpi"]
-mpis = ["mpi-slurm"]
-
-[target.osx-arm64.dependencies]
-khronos-opencl-icd-loader = ">=2024.10.24,<2025"
-ocl_icd_wrapper_apple = ">=1.0.0,<2"
-
-[target.linux-64.dependencies]
-cuda-compiler = ">=12.4,<14"
-cuda-libraries = ">=12.4,<14"
-cuda-libraries-dev = ">=12.4,<14"
-cuda-nvml-dev = ">=12.4,<14"
-ocl-icd = ">=2.3.4,<3"
