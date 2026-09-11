@@ -6,21 +6,25 @@
 
 当前配置涉及下载、构建、目标平台和按后端区分的可执行文件命名；具体参数以 `pixi.toml` 为准。
 
+## GROMACS 版本参数
+
+构建 task 的第一个参数是 GROMACS 版本，当前支持 `2023.5`、`2024.6`、`2025.5` 和 `2026.3`。
+版本参数会同时传递给下载、PLUMED patch、标准构建和 double-precision 构建，下载包、源码目录、build 目录、安装前缀和 task `outputs` 都按版本隔离。
+
 `_d_plumed` 使用 `curl -L -C -` 下载 `plumed-src-2.10.1.tgz` 到 `pkg/`。
 
-`_d_gromacs` 使用 `curl -L -C -` 下载 `gromacs-2023.5.tar.gz` 到 `pkg/`。
+`_d_gromacs` 使用 `curl -L -C -` 下载 `gromacs-{{ version }}.tar.gz` 到 `pkg/`。
 
 `down` 依赖 `_d_plumed` 和 `_d_gromacs`。
 
 `_mk_plumed` 解压 PLUMED 2.10.1，执行 `./configure --prefix="$(pwd)/../local" && make install`，并生成 `local/bin/plumed` 和 `local/bin/plumed-patch`。
 
-`_p_gromacs` 解压 GROMACS 2023.5，并执行 `plumed-patch -e gromacs-2023.5 -p`。
+`_p_gromacs` 解压 `gromacs-{{ version }}`，并执行 `plumed-patch -e gromacs-{{ version }} -p`。
 
-`_mk_gromacs` 在 `gromacs-2023.5/build` 中执行 CMake、并行编译和安装。
+`_mk_gromacs` 接收第二个参数 `variant`，可取 `single`、`double` 或 `ocl`。
+它分别在 `gromacs-{{ version }}/build_single`、`gromacs-{{ version }}/build_double` 或 `gromacs-{{ version }}/build_ocl` 中执行 CMake、并行编译和安装到 `local/{{ version }}/`。
 
-`_mk_gromacs_d` 在 `gromacs-2023.5/build_d` 中执行 CPU double-precision、MPI 构建和安装。
-
-`build` 依赖 `_mk_plumed`、`_mk_gromacs` 和 `_mk_gromacs_d`。
+`build` 对同一个 `_mk_gromacs` task 分别传入 `single` 和 `double` 两个 `variant`；Linux 的 `mk_gromacs_ocl` 则直接调用 `_mk_gromacs` 的 `ocl` variant。
 
 从项目根目录执行完整构建：
 
@@ -29,11 +33,19 @@ cd /Volumes/Develop/git/szbl-hpc/pixies/gromacs
 pixi run build
 ```
 
+构建其他版本时直接传入版本参数，例如：
+
+```bash
+pixi run build 2024.6
+pixi run build 2025.5
+pixi run build 2026.3
+```
+
 激活环境会把 `local/bin` 加入 `PATH`，并加载 `local/bin/GMXRC.bash`。
 
 ## DGROMACS 参数
 
-使用 target-specific activation environment 设置 `DGROMACS1`、`DGROMACS2` 和 Linux 专用的 `DGROMACS3`，再由公共的 `DGROMACS0` 补充 MPI、PLUMED、HWLOC 和安装前缀参数，可以用同一个 Pixi task 切换不同平台的 CMake 参数。
+使用 target-specific activation environment 设置 `DGROMACS_GPU`、`DGROMACS_GPU_Toolchain` 和按平台区分的 `GMX_SUFFIX`，再由公共的 `DGROMACS_Common` 补充 MPI、PLUMED 和 HWLOC 参数；task 根据 `$GMX_SUFFIX` 生成 CMake 的 binary/library suffix 参数，安装前缀由版本参数直接传给 CMake。
 
 当前 target 与可执行文件命名约定如下：
 
@@ -46,9 +58,19 @@ pixi run build
 `gpu-linux-64` 是带 CUDA `12.4` 和 glibc `2.17` 约束的 Linux target；`centos75` 是带 glibc `2.17` 和 Linux `3.10` 约束的 Linux target。
 两个 Linux target 都匹配 `target.linux-64.activation.env` 和 `target.linux-64.dependencies`，因此当前都使用 CUDA、Open MPI 和相同的 CUDA 依赖；差异只在 Pixi 的虚拟平台约束。
 
-当前 `_mk_gromacs` 的 task `outputs` 固定为 `local/bin/gmx_mpi` 和 `gromacs-2023.5/build/bin/gmx_mpi`，三个 target 都使用这个输出名。
-`_mk_gromacs_d` 的输出是 `local/bin/gmx_mpi_d` 和 `gromacs-2023.5/build_d/bin/gmx_mpi_d`。
-Linux 专用的 `mk_gromacs_ocl` 输出是 `local/bin/gmx_mpi_ocl` 和 `gromacs-2023.5/build_ocl/bin/gmx_mpi_ocl`。
+`_mk_gromacs` 的 task `outputs` 是按版本、`variant` 和 MPI suffix 展开的 `local/{{ version }}/bin/gmx{{ GMX_SUFFIX }}`；`double` variant 会在 suffix 后追加 `_d`。
+Linux 专用的 `mk_gromacs_ocl` 输出位于 `local/{{ version }}/bin/gmx{{ GMX_SUFFIX }}` 和对应的 `build_ocl/bin/`。
+
+macOS 的 `mpi5` 环境使用 MPICH 和 `_mpi` suffix；`mpis` 环境使用 Open MPI，并将 standard/double 构建的 suffix 改为 `_ompi`/`_ompi_d`，避免多个 MPI 版本共用文件名。
+
+安装某个版本后，用 `switch-gromacs.sh` 选择 `GMXRC` 和 `GMXRC.bash`：
+
+```bash
+./switch-gromacs.sh 2023.5
+```
+
+脚本会把 `local/bin/GMXRC` 和 `local/bin/GMXRC.bash` 链接到所选版本的 `local/<version>/bin/`。
+Pixi activation 继续加载 `local/bin/GMXRC.bash`，手工使用时可以执行 `source local/bin/GMXRC`。
 
 macOS `osx-arm64` 当前使用：
 
@@ -72,8 +94,8 @@ Linux 专用的 `mk_gromacs_ocl` 会覆盖 GPU 后端为 OpenCL，并额外使�
 ```text
 -DGMX_GPU=OpenCL
 -DGMX_DEFAULT_SUFFIX=OFF
--DGMX_BINARY_SUFFIX=_mpi_ocl
--DGMX_LIBS_SUFFIX=_mpi_ocl
+-DGMX_BINARY_SUFFIX=$GMX_SUFFIX
+-DGMX_LIBS_SUFFIX=$GMX_SUFFIX
 ```
 
 三种 target 都额外继承公共参数：
@@ -81,19 +103,19 @@ Linux 专用的 `mk_gromacs_ocl` 会覆盖 GPU 后端为 OpenCL，并额外使�
 ```text
 -DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON
 -DGMX_HWLOC=ON
--DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local
+-DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local/{{ version }}
 ```
 
-Pixi task 内的 `cmake .. $DGROMACS0 $DGROMACS1 $DGROMACS2` 可以正常展开为多个 `-D` 参数；Linux 的 `mk_gromacs_ocl` 还会追加 `$DGROMACS3`。
+Pixi task 内的 `cmake .. $DGROMACS_Common $DGROMACS_GPU $DGROMACS_GPU_Toolchain` 会显式设置 `GMX_DEFAULT_SUFFIX=OFF`，并由 `$GMX_SUFFIX` 生成 `GMX_BINARY_SUFFIX` 和 `GMX_LIBS_SUFFIX`；double variant 会在该 suffix 后再追加 `_d`。
 
 在 build 目录手工重新配置时，必须让变量在 Pixi shell 中展开：
 
 ```bash
 cd /Volumes/Develop/git/szbl-hpc/pixies/gromacs/gromacs-2023.5/build
-pixi run sh -c 'cmake .. $DGROMACS0 $DGROMACS1 $DGROMACS2'
+pixi run sh -c 'cmake .. $DGROMACS_Common $DGROMACS_GPU $DGROMACS_GPU_Toolchain'
 ```
 
-不要直接使用 `pixi run cmake .. $DGROMACS0 $DGROMACS1 $DGROMACS2`，因为外层 shell 会先展开这些变量，导致参数为空。
+不要直接使用 `pixi run cmake .. $DGROMACS_Common $DGROMACS_GPU $DGROMACS_GPU_Toolchain`，因为外层 shell 会先展开这些变量，导致参数为空。
 
 重新配置后可以继续增量构建：
 
@@ -103,12 +125,12 @@ pixi run cmake --build . --parallel 2
 
 切换 GROMACS 版本或大幅切换 CMake 选项时，建议使用新的 build 目录，避免旧 `CMakeCache.txt` 保留旧源码路径、安装前缀或编译选项。
 
-当前 macOS GROMACS 2023.5 的标准 build 关键配置为 `GMX_GPU=OpenCL`、`GMX_DOUBLE=OFF`、`GMX_MPI=ON`、`GMX_HWLOC=ON`、`GMX_OPENMP=ON` 和 `GMX_THREAD_MPI=OFF`，安装前缀为 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/local`，可执行文件为 `gmx_mpi`。
+当前 macOS GROMACS 2023.5 的标准 build 关键配置为 `GMX_GPU=OpenCL`、`GMX_DOUBLE=OFF`、`GMX_MPI=ON`、`GMX_HWLOC=ON`、`GMX_OPENMP=ON` 和 `GMX_THREAD_MPI=OFF`，安装前缀为 `/Volumes/Develop/git/szbl-hpc/pixies/gromacs/local/2023.5`；`mpi5` 生成 `gmx_mpi`，`mpis` 生成 `gmx_ompi`。
 
 ## HWLOC 与 double precision
 
 GROMACS 2023.5 的 CMake 公开选项是 `GMX_HWLOC`，不是 `GMX_USE_HWLOC`。
-`GMX_USE_HWLOC` 是 CMake 根据 `GMX_HWLOC` 和 `FindHWLOC.cmake` 的检测结果生成的内部变量，不应从 `DGROMACS0` 手工传入。
+`GMX_USE_HWLOC` 是 CMake 根据 `GMX_HWLOC` 和 `FindHWLOC.cmake` 的检测结果生成的内部变量，不应从 `DGROMACS_Common` 手工传入。
 
 如果传入 `-DGMX_USE_HWLOC=ON`，但没有同时启用 `GMX_HWLOC`，CMake 不会执行 `FindHWLOC.cmake`，也不会设置 `GMX_HWLOC_API_VERSION`。
 此时生成的 `src/include/config.h` 会包含空的 `#define GMX_HWLOC_API_VERSION`，随后 `hardwaretopology.cpp` 中的版本判断会变成非法的预处理表达式：
@@ -130,25 +152,25 @@ GROMACS 2023.5 的 CMake 公开选项是 `GMX_HWLOC`，不是 `GMX_USE_HWLOC`。
 #define GMX_HWLOC_API_VERSION 0x00020c00
 ```
 
-`cmake --fresh` 会清理旧的 `CMakeCache.txt` 和 `CMakeFiles`，因此切换 hwloc 选项时应通过 `_mk_gromacs_d` 重新配置，而不要继续使用包含错误内部变量的旧缓存。
+`cmake --fresh` 会清理旧的 `CMakeCache.txt` 和 `CMakeFiles`，因此切换 hwloc 选项时应通过 `_mk_gromacs` 的 `double` variant 重新配置，而不要继续使用包含错误内部变量的旧缓存。
 
 ## 可执行文件与库后缀
 
-`GMX_GPU` 决定 GPU 后端，后缀只决定安装文件名，二者是独立的配置。`GMX_DEFAULT_SUFFIX=ON` 时，GROMACS 会根据构建类型自动设置后缀：MPI 使用 `_mpi`，double precision 使用 `_d`，两者同时启用时源码中的组合顺序是 `_mpi_d`。
+`GMX_GPU` 决定 GPU 后端，后缀只决定安装文件名，二者是独立的配置。当前统一使用 `GMX_DEFAULT_SUFFIX=OFF`，由 task 显式设置 `GMX_BINARY_SUFFIX` 和 `GMX_LIBS_SUFFIX`；double variant 使用 `${GMX_SUFFIX}_d`，从而保留 MPI/OpenMPI/OpenCL suffix 并追加 double suffix。
 
-因此当前三个 target 的 standard single-precision MPI 构建都使用默认配置生成 `gmx_mpi`；它不会因为 `GMX_GPU=CUDA` 自动变成 `gmx_cuda`，也不会因为 `GMX_GPU=OpenCL` 自动变成 `gmx_ocl_mpi`。
+因此当前三个 target 的 standard single-precision MPI 构建都使用显式 suffix 生成 `gmx_mpi`、`gmx_ompi` 或 `gmx_mpi_ocl`；它不会因为 `GMX_GPU=CUDA` 自动变成 `gmx_cuda`，也不会因为 `GMX_GPU=OpenCL` 自动变成 `gmx_ocl_mpi`。
 
-`_mk_gromacs_d` 显式设置 `GMX_DOUBLE=ON`，使用默认 suffix 生成 `gmx_mpi_d`。
-Linux 专用的 `mk_gromacs_ocl` 显式关闭默认 suffix，并使用 `_mpi_ocl`，生成 `gmx_mpi_ocl`。
+`_mk_gromacs` 的 `double` variant 显式设置 `GMX_DOUBLE=ON`，并把 `GMX_BINARY_SUFFIX` 与 `GMX_LIBS_SUFFIX` 设置为 `${GMX_SUFFIX}_d`；仅修改 task output 名称是不够的。
+Linux 专用的 `mk_gromacs_ocl` 显式关闭默认 suffix，并使用 target 中的 `GMX_SUFFIX`，生成 `gmx_mpi_ocl`。
 
 当前配置的 suffix 状态如下：
 
 ```text
-osx-arm64:      GMX_DEFAULT_SUFFIX=ON（默认），GMX_BINARY_SUFFIX=，GMX_LIBS_SUFFIX=，输出 gmx_mpi
-gpu-linux-64:   GMX_DEFAULT_SUFFIX=ON（默认），GMX_BINARY_SUFFIX=，GMX_LIBS_SUFFIX=，输出 gmx_mpi
-centos75:       GMX_DEFAULT_SUFFIX=ON（默认），GMX_BINARY_SUFFIX=，GMX_LIBS_SUFFIX=，输出 gmx_mpi
-linux-64 OCL:   GMX_DEFAULT_SUFFIX=OFF，GMX_BINARY_SUFFIX=_mpi_ocl，GMX_LIBS_SUFFIX=_mpi_ocl，输出 gmx_mpi_ocl
-double build:   GMX_DEFAULT_SUFFIX=ON（默认），GMX_BINARY_SUFFIX=，GMX_LIBS_SUFFIX=，输出 gmx_mpi_d
+osx-arm64 mpi5: GMX_DEFAULT_SUFFIX=OFF，GMX_BINARY_SUFFIX=_mpi，GMX_LIBS_SUFFIX=_mpi，输出 gmx_mpi
+osx-arm64 mpis: GMX_DEFAULT_SUFFIX=OFF，GMX_BINARY_SUFFIX=_ompi，GMX_LIBS_SUFFIX=_ompi，输出 gmx_ompi
+gpu-linux-64:   GMX_DEFAULT_SUFFIX=OFF，GMX_BINARY_SUFFIX=_mpi_ocl，GMX_LIBS_SUFFIX=_mpi_ocl，输出 gmx_mpi_ocl
+centos75:       GMX_DEFAULT_SUFFIX=OFF，GMX_BINARY_SUFFIX=_mpi_ocl，GMX_LIBS_SUFFIX=_mpi_ocl，输出 gmx_mpi_ocl
+double build:   `GMX_BINARY_SUFFIX=${GMX_SUFFIX}_d`，`GMX_LIBS_SUFFIX=${GMX_SUFFIX}_d`
 ```
 
 对应的库名称分别为 standard build 的 `libgromacs_mpi`、double build 的 `libgromacs_mpi_d` 和 Linux OpenCL build 的 `libgromacs_mpi_ocl`。
@@ -206,7 +228,7 @@ GROMACS 2023.5 默认开启 OpenMP；`GMX_THREAD_MPI=OFF` 只关闭内置 thread
 OMP_NUM_THREADS=8 mpirun -np 4 gmx_mpi mdrun -ntomp 8
 ```
 
-当前三个 target 都使用 `gmx_mpi`。这里的 `-np 4` 是 MPI rank 数量，`-ntomp 8` 是每个 rank 的 OpenMP 线程数，总 CPU 线程数为 32。
+默认 `mpi5` target 使用 `gmx_mpi`，macOS 的 `mpis` 使用 `gmx_ompi`。这里的 `-np 4` 是 MPI rank 数量，`-ntomp 8` 是每个 rank 的 OpenMP 线程数，总 CPU 线程数为 32。
 
 同时设置 `OMP_NUM_THREADS` 和 `-ntomp` 时，两者必须一致，否则 GROMACS 会报错。
 

@@ -8,56 +8,118 @@ version = "0.1.0"
 [tasks]
 
 [tasks._d_plumed]
-cmd = "mkdir -p pkg && curl -L -C - -o pkg/plumed-src-2.10.1.tgz https://github.com/plumed/plumed2/releases/download/v2.10.1/plumed-src-2.10.1.tgz"
+cmd = """
+    mkdir -p pkg \
+    && curl -L -C - -o pkg/plumed-src-2.10.1.tgz \
+        https://github.com/plumed/plumed2/releases/download/v2.10.1/plumed-src-2.10.1.tgz
+"""
 outputs = ["pkg/plumed-src-2.10.1.tgz"]
 
 [tasks._d_gromacs]
-cmd = "mkdir -p pkg && curl -L -C - -o pkg/gromacs-2023.5.tar.gz https://ftp.gromacs.org/gromacs/gromacs-2023.5.tar.gz"
-outputs = ["pkg/gromacs-2023.5.tar.gz"]
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+cmd = """
+    mkdir -p pkg \
+    && curl -L -C - -o pkg/gromacs-{{ version }}.tar.gz \
+        https://ftp.gromacs.org/gromacs/gromacs-{{ version }}.tar.gz
+"""
+outputs = ["pkg/gromacs-{{ version }}.tar.gz"]
 
 [tasks._mk_plumed]
 depends-on = ["_d_plumed"]
-cmd = "test -f local/bin/plumed-patch || ( tar -xf pkg/plumed-src-2.10.1.tgz && cd plumed-2.10.1 && ./configure --prefix=\"$(pwd)/../local\" && make install && rm src/include/plumed )"
+cmd = """
+    test -f local/bin/plumed-patch || ( \
+        tar -xf pkg/plumed-src-2.10.1.tgz \
+        && cd plumed-2.10.1 \
+        && ./configure --prefix=\"$(pwd)/../local\" \
+        && make install \
+        && rm src/include/plumed \
+    )
+"""
 outputs = ["local/bin/plumed", "local/bin/plumed-patch"]
 
 [tasks._p_gromacs]
-depends-on = ["_d_gromacs", "_mk_plumed"] # 必须确保 plumed 先编译完成并生成了 patch 工具
-cmd = "tar -xf pkg/gromacs-2023.5.tar.gz && cd gromacs-2023.5 && plumed-patch -e gromacs-2023.5 -p"
-outputs = ["gromacs-2023.5/src/gromacs/mdrun/runner.cpp.preplumed"]
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+depends-on = [
+    { task = "_d_gromacs", args = ["{{ version }}"] },
+    "_mk_plumed",
+] # 必须确保 plumed 先编译完成并生成了 patch 工具
+cmd = """
+    test -d gromacs-{{ version }} || tar -xf pkg/gromacs-{{ version }}.tar.gz \
+    && cd gromacs-{{ version }} \
+    && plumed-patch -e gromacs-{{ version }} -p
+"""
+outputs = ["gromacs-{{ version }}/src/gromacs/mdrun/runner.cpp.preplumed"]
 
 [tasks._mk_gromacs]
-depends-on = ["_p_gromacs", "_mk_plumed"]
-cmd = "mkdir -p gromacs-2023.5/build && cd gromacs-2023.5/build && cmake --fresh .. $DGROMACS0 $DGROMACS1 $DGROMACS2 && make && make install"
-outputs = ["local/bin/gmx_mpi", "gromacs-2023.5/build/bin/gmx_mpi"]
-
-[tasks._mk_gromacs_d]
-depends-on = ["_p_gromacs", "_mk_plumed"]
-cmd = "mkdir -p gromacs-2023.5/build_d && cd gromacs-2023.5/build_d && cmake --fresh .. $DGROMACS0 -DGMX_GPU=OFF -DGMX_DOUBLE=ON $DGROMACS2 && make && make install"
-outputs = ["local/bin/gmx_mpi_d", "gromacs-2023.5/build_d/bin/gmx_mpi_d"]
+args = [
+    { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
+    { arg = "variant", default = "single", choices = ["single", "double", "ocl"] },
+]
+depends-on = [
+    { task = "_p_gromacs", args = ["{{ version }}"] },
+    "_mk_plumed",
+]
+cmd = """
+    mkdir -p gromacs-{{ version }}/build_{{ variant }} \
+    && cd gromacs-{{ version }}/build_{{ variant }} \
+    && cmake --fresh .. \
+        $DGROMACS_Common \
+        -DGMX_DEFAULT_SUFFIX=OFF \
+        $DGROMACS_GPU_Toolchain \
+        {% if variant == "double" %}
+        -DGMX_GPU=OFF -DGMX_DOUBLE=ON \
+        -DGMX_BINARY_SUFFIX=${GMX_SUFFIX}_d \
+        -DGMX_LIBS_SUFFIX=${GMX_SUFFIX}_d \
+        {% elif variant == "ocl" %}
+        -DGMX_GPU=OpenCL \
+        -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
+        -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
+        {% else %}
+        $DGROMACS_GPU \
+        -DGMX_BINARY_SUFFIX=$GMX_SUFFIX \
+        -DGMX_LIBS_SUFFIX=$GMX_SUFFIX \
+        {% endif %}
+        -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local/{{ version }} \
+    && make \
+    && make install
+"""
+outputs = [
+    "local/{{ version }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
+    "gromacs-{{ version }}/build_{{ variant }}/bin/gmx{{ GMX_SUFFIX }}{% if variant == \"double\" %}_d{% endif %}",
+]
 
 [target.linux-64.tasks.mk_gromacs_ocl]
-depends-on = ["_p_gromacs", "_mk_plumed"]
-cmd = "mkdir -p gromacs-2023.5/build_ocl && cd gromacs-2023.5/build_ocl && cmake --fresh .. $DGROMACS0 -DGMX_GPU=OpenCL $DGROMACS2 $DGROMACS3 && make && make install"
-outputs = ["local/bin/gmx_mpi_ocl", "gromacs-2023.5/build_ocl/bin/gmx_mpi_ocl"]
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+depends-on = [{ task = "_mk_gromacs", args = ["{{ version }}", "ocl"] }]
 
 [tasks.down]
-depends-on = ["_d_plumed", "_d_gromacs"]
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+depends-on = [
+    "_d_plumed",
+    { task = "_d_gromacs", args = ["{{ version }}"] },
+]
 
 [tasks.build]
-depends-on = ["_mk_plumed", "_mk_gromacs", "_mk_gromacs_d"]
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+depends-on = [
+    "_mk_plumed",
+    { task = "_mk_gromacs", args = ["{{ version }}", "single"] },
+    { task = "_mk_gromacs", args = ["{{ version }}", "double"] },
+]
 
 [activation]
 env = {
     PATH = "$PIXI_PROJECT_ROOT/local/bin:$PATH",
-    DGROMACS0 = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON -DCMAKE_INSTALL_PREFIX=$PIXI_PROJECT_ROOT/local",
+    DGROMACS_Common = "-DGMX_USE_PLUMED=ON -DGMX_THREAD_MPI=OFF -DGMX_MPI=ON -DGMX_HWLOC=ON",
+    GMX_SUFFIX = "_mpi",
     CXXFLAGS = "-Wno-missing-include-dirs -Wno-deprecated-literal-operator -Wno-deprecated-declarations -Wno-switch-default"
 }
 scripts = ["local/bin/GMXRC.bash"]
 
 [target.osx-arm64.activation.env]
 MAKEFLAGS = "-j4"
-DGROMACS1 = "-DGMX_GPU=OpenCL -DGMX_DOUBLE=OFF"
-DGROMACS2 = """ \
+DGROMACS_GPU = "-DGMX_GPU=OpenCL -DGMX_DOUBLE=OFF"
+DGROMACS_GPU_Toolchain = """ \
 -DOpenCL_INCLUDE_DIR=$CONDA_PREFIX/include \
 -DOpenCL_LIBRARY=$CONDA_PREFIX/lib/libOpenCL.dylib \
 """
@@ -66,13 +128,13 @@ FI_PROVIDER = "tcp"
 [target.linux-64.activation.env]
 MAKEFLAGS = "-j8"
 LD_LIBRARY_PATH = "$PIXI_PROJECT_ROOT/local/lib:$LD_LIBRARY_PATH"
-DGROMACS1 = "-DGMX_GPU=CUDA"
-DGROMACS2 = """ \
+DGROMACS_GPU = "-DGMX_GPU=CUDA"
+DGROMACS_GPU_Toolchain = """ \
 -DCMAKE_INSTALL_LIBDIR=lib \
 -DCUDA_NVCC_EXECUTABLE=$CONDA_PREFIX/bin/nvcc \
 -DCMAKE_CUDA_COMPILER=$CONDA_PREFIX/bin/nvcc \
 """
-DGROMACS3 = "-DGMX_DEFAULT_SUFFIX=OFF -DGMX_BINARY_SUFFIX=_mpi_ocl -DGMX_LIBS_SUFFIX=_mpi_ocl"
+GMX_SUFFIX = "_mpi_ocl"
 GMX_FORCE_GPU_AWARE_MPI = "1"
 
 [dependencies]
@@ -100,6 +162,9 @@ dependencies = { openmpi = { version = ">=5.0.8,<6", build = "external_*" } }
 
 [feature.mpi-slurm.target.osx-arm64.dependencies]
 openmpi = ">=5.0.8,<6"
+
+[feature.mpi-slurm.target.osx-arm64.activation.env]
+GMX_SUFFIX = "_ompi"
 
 [feature.mpi.target.linux-64.dependencies]
 openmpi = ">=5.0.8,<6"
