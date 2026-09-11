@@ -6,6 +6,7 @@ platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda =
 version = "0.1.0"
 
 [tasks._d_plumed]
+description = "Download the PLUMED 2.10.1 source archive."
 cmd = """
     mkdir -p pkg \
     && curl -L -C - -o pkg/plumed-src-2.10.1.tgz \
@@ -14,6 +15,7 @@ cmd = """
 outputs = ["pkg/plumed-src-2.10.1.tgz"]
 
 [tasks._d_gromacs]
+description = "Download a GROMACS source archive."
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
 cmd = """
     mkdir -p pkg \
@@ -23,6 +25,8 @@ cmd = """
 outputs = ["pkg/gromacs-{{ version }}.tar.gz"]
 
 [tasks._mk_plumed]
+description = "Build and install PLUMED for the active Pixi environment."
+args = [{ arg = "pixi_env", default = "default" }]
 depends-on = ["_d_plumed"]
 cmd = """
     plumed_dir="plumed-2.10.1/{{ pixi.environment.name }}" \
@@ -48,10 +52,11 @@ outputs = [
 ]
 
 [tasks._p_gromacs]
+description = "Patch GROMACS with the PLUMED build for the active Pixi environment."
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
 depends-on = [
     { task = "_d_gromacs", args = ["{{ version }}"] },
-    "_mk_plumed",
+    { task = "_mk_plumed", args = ["{{ pixi.environment.name }}"] },
 ] # 必须确保 plumed 先编译完成并生成了 patch 工具
 cmd = """
     gromacs_dir="gromacs-{{ version }}/{{ pixi.environment.name }}" \
@@ -70,6 +75,7 @@ outputs = [
 ]
 
 [tasks._mk_gromacs]
+description = "Configure, build, and install one GROMACS variant."
 args = [
     { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
     { arg = "variant", default = "single", choices = ["single", "double", "ocl"] },
@@ -77,7 +83,7 @@ args = [
 ]
 depends-on = [
     { task = "_p_gromacs", args = ["{{ version }}"] },
-    "_mk_plumed",
+    { task = "_mk_plumed", args = ["{{ pixi.environment.name }}"] },
 ]
 cmd = """
     gromacs_dir="gromacs-{{ version }}/{{ pixi.environment.name }}" \
@@ -115,6 +121,7 @@ outputs = [
 ]
 
 [tasks._batch_mk_gromacs]
+description = "Build the single- and double-precision GROMACS variants."
 args = [
     { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
     { arg = "suffix", default = "" },
@@ -125,6 +132,7 @@ depends-on = [
 ]
 
 [target.linux-64.tasks._batch_mk_gromacs]
+description = "Build the single-, double-, and OpenCL GROMACS variants on Linux."
 args = [
     { arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] },
     { arg = "suffix", default = "" },
@@ -136,6 +144,7 @@ depends-on = [
 ]
 
 [tasks.down]
+description = "Download the PLUMED and GROMACS source archives."
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
 depends-on = [
     "_d_plumed",
@@ -143,9 +152,10 @@ depends-on = [
 ]
 
 [tasks.build]
+description = "Build PLUMED and the GROMACS variants for the active environment."
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
 depends-on = [
-    "_mk_plumed",
+    { task = "_mk_plumed", args = ["{{ pixi.environment.name }}"] },
     { task = "_batch_mk_gromacs", args = [
         "{{ version }}",
         """{%- if pixi.environment.name == "default" -%}
