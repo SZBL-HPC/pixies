@@ -34,8 +34,7 @@ cmd = """
         --exclude='plumed-2.10.1/src/include/plumed' \
         -C "$plumed_dir" \
     && cd "$plumed_dir" \
-    && CPPFLAGS="-I$CONDA_PREFIX/include" LDFLAGS="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib" \
-        ./configure --prefix="$plumed_prefix" \
+    && ./configure --prefix="$plumed_prefix" \
             --enable-rpath \
             --enable-zlib --enable-gsl --enable-fftw \
             --disable-python --disable-pycv \
@@ -239,5 +238,7 @@ DGROMACS_GPU_Toolchain = """ \
 scripts = ["activate_mpi.sh"]
 
 [feature.mpi-slurm.target.linux-64.activation.env]
+CPPFLAGS="-I$CONDA_PREFIX/include"
+LDFLAGS="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib"
 USE_SLURM = "1"
 GMX_FORCE_GPU_AWARE_MPI = "1"
