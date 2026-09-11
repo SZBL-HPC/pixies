@@ -2,7 +2,7 @@
 authors = ["HU Xuesong <87519979+huxs001@users.noreply.github.com>"]
 channels = ["conda-forge", "bioconda"]
 name = "gromacs"
-platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }, { name = "centos75", platform = "linux-64", glibc = "2.17", linux = "3.10" }]
+platforms = ["osx-arm64", { name = "gpu-linux-64", platform = "linux-64", cuda = "12.4", glibc = "2.17" }, { name = "centos75", platform = "linux-64", glibc = "2.17", linux = "3.10" }, "linux-64"]
 version = "0.1.0"
 
 [tasks]
@@ -58,8 +58,8 @@ scripts = ["local/bin/GMXRC.bash"]
 MAKEFLAGS = "-j4"
 DGROMACS1 = "-DGMX_GPU=OpenCL -DGMX_DOUBLE=OFF"
 DGROMACS2 = """ \
--DOpenCL_INCLUDE_DIR=$PIXI_PROJECT_ROOT/.pixi/envs/default/include \
--DOpenCL_LIBRARY=$PIXI_PROJECT_ROOT/.pixi/envs/default/lib/libOpenCL.dylib \
+-DOpenCL_INCLUDE_DIR=$CONDA_PREFIX/include \
+-DOpenCL_LIBRARY=$CONDA_PREFIX/lib/libOpenCL.dylib \
 """
 FI_PROVIDER = "tcp"
 
@@ -69,8 +69,8 @@ LD_LIBRARY_PATH = "$PIXI_PROJECT_ROOT/local/lib:$LD_LIBRARY_PATH"
 DGROMACS1 = "-DGMX_GPU=CUDA"
 DGROMACS2 = """ \
 -DCMAKE_INSTALL_LIBDIR=lib \
--DCUDA_NVCC_EXECUTABLE=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc \
--DCMAKE_CUDA_COMPILER=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc \
+-DCUDA_NVCC_EXECUTABLE=$CONDA_PREFIX/bin/nvcc \
+-DCMAKE_CUDA_COMPILER=$CONDA_PREFIX/bin/nvcc \
 """
 DGROMACS3 = "-DGMX_DEFAULT_SUFFIX=OFF -DGMX_BINARY_SUFFIX=_mpi_ocl -DGMX_LIBS_SUFFIX=_mpi_ocl"
 GMX_FORCE_GPU_AWARE_MPI = "1"
@@ -85,17 +85,39 @@ pip = ">=26.2.1,<27"
 setuptools = ">=84.0.0,<85"
 cython = ">=3.3.0,<4"
 pkg-config = ">=0.29.2,<0.30"
-fftw = { build = "mpi_*", version = ">=3.3,<4" }
+fftw = ">=3.3,<4"
 libhwloc = ">=2.12.2,<3"
 pocl = ">=7.1,<8"
 
-[target.osx-arm64.dependencies]
+[feature.mpi-slurm]
+channels = ["conda-forge/label/mpi-external"]
+dependencies = { fftw = { build = "mpi_*" } }
+
+[feature.mpi-slurm.target.linux-64]
+activation.env = { USE_SLURM = "1" }
+activation.scripts = [ "activate_mpi.sh" ]
+dependencies = { openmpi = { version = ">=5.0.8,<6", build = "external_*" } }
+
+[feature.mpi-slurm.target.osx-arm64.dependencies]
+openmpi = ">=5.0.8,<6"
+
+[feature.mpi.target.linux-64.dependencies]
+openmpi = ">=5.0.8,<6"
+fftw = { build = "mpi_*" }
+
+[feature.mpi.target.osx-arm64.dependencies]
 mpich = ">=5.0.0,<6"
+fftw = { build = "mpi_*" }
+
+[environments]
+mpi5 = ["mpi"]
+mpis = ["mpi-slurm"]
+
+[target.osx-arm64.dependencies]
 khronos-opencl-icd-loader = ">=2024.10.24,<2025"
 ocl_icd_wrapper_apple = ">=1.0.0,<2"
 
 [target.linux-64.dependencies]
-openmpi = ">=5.0.8,<6"
 cuda-compiler = ">=12.4,<14"
 cuda-libraries = ">=12.4,<14"
 cuda-libraries-dev = ">=12.4,<14"
