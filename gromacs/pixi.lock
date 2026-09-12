@@ -1197,9 +1197,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hf451053_7.conda
   mpis:
     channels:
-    - url: https://conda.anaconda.org/conda-forge/label/mpi-external/
     - url: https://conda.anaconda.org/conda-forge/
     - url: https://conda.anaconda.org/bioconda/
+    - url: https://conda.anaconda.org/conda-forge/label/mpi-external/
     packages:
       centos75:
       - conda: https://conda.anaconda.org/conda-forge/label/mpi-external/linux-64/openmpi-5.0.10-external_hdd4cb8c_2.conda
