@@ -19,7 +19,8 @@ PLUMED 的安装目录也按环境隔离；GROMACS 的安装目录目前按版�
 
 `down` 依赖 `_d_plumed` 和 `_d_gromacs`。
 
-`_mk_plumed` 将 PLUMED 2.10.1 解压到 `plumed-2.10.1/{{ pixi.environment.name }}/`，执行 `./configure --disable-python --disable-pycv` 和 `make -C src install`，并安装到 `local/plumed/{{ pixi.environment.name }}/`。
+`_mk_plumed` 将 PLUMED 2.10.1 解压到 `plumed-2.10.1/{{ pixi.environment.name }}/`，执行 configure 和 `make -C src install`，并安装到 `local/plumed/{{ pixi.environment.name }}/`。
+`PLUMEDCONF` 按 target 设置：macOS 使用 `--disable-python --disable-pycv`，Linux 为空，不禁用 Python；安装阶段显式传入 `LDFLAGS="$LDFLAGS"`。
 解压时会排除 archive 中会触发 Pixi 循环遍历错误的 `src/include/plumed -> ../` 符号链接。
 
 `plumed-benchmark` 依赖当前 Pixi 环境的 `_mk_plumed`，在 `.pixi/plumed-benchmark/{{ pixi.environment.name }}/` 生成最小的 `plumed.dat`，然后运行 100 步、10 个原子的 PLUMED benchmark；输出文件也留在该临时目录，不会污染项目根目录。
@@ -107,7 +108,7 @@ CUDA 和 OpenCL 不会改变 `resourceassignment.h` 的 MPI 配置内容；但�
 
 PLUMED 2.10.1 release archive 中包含 `src/include/plumed -> ../` 循环符号链接。Pixi 的 task walker 会跟随该链接，并且不使用 `.gitignore` 过滤，因此 `.gitignore` 和 `pixi run --no-symbolic-links` 都不能解决这个问题。`_mk_plumed` 解包时使用 `tar --exclude='plumed-2.10.1/src/include/plumed'`；删除或不解包该链接不会影响 `configure` 或 `make -C src install`。
 
-PLUMED 的构建只使用 `make -C src install`，并通过 `--disable-python --disable-pycv` 禁止 Python/PyCV；不会进入顶层的 Python 和 Vim 构建目录。无条件的 `make clean` 也没有必要，因为 task cache miss 时会重新解包独立的环境目录，cache hit 时不会执行构建。
+PLUMED 的构建只使用 `make -C src install`，macOS 通过 `--disable-python --disable-pycv` 禁止 Python/PyCV；不会进入顶层的 Vim 构建目录。Linux 不传这两个禁用选项。无条件的 `make clean` 也没有必要，因为 task cache miss 时会重新解包独立的环境目录，cache hit 时不会执行构建。
 
 PLUMED 2.10.1 对 zlib、GSL 和 FFTW 使用头文件及直接链接检查，不依赖 `pkg-config`。当前配置保留：
 
@@ -382,16 +383,31 @@ GROMACS 2024.2 尚未包含该 commit，2024.3 及之后的 release 已包含。
 
 邻近版本有时可以应用 patch，但不能因为都属于 `2025.x` 就认为行为和接口一定兼容；官方支持和可复现构建应使用 patch 文件名对应的精确 GROMACS release。
 
+PLUMED 2.10.1 archive 中实际提供的 GROMACS patch 目录是
+`gromacs-2023.5.diff`、`gromacs-2024.3.diff` 和 `gromacs-2025.0.diff`。
+当前项目构建的 `2023.5` 使用精确 patch，`2024.6` 回退到同一大版本的 `2024.3` patch，`2025.5` 回退到 `2025.0` patch。
+
 PLUMED 2.10 官方的 GROMACS 2025.0 patch 页面是：
 `https://www.plumed.org/doc-v2.10/user-doc/html/gromacs-2025-0.html`。
 
-用 `gromacs-2025.0` patch 处理 GROMACS 2025.5 时，`local/plumed/mpi5/lib/plumed/patches/gromacs-2025.0.diff/src/gromacs/CMakeLists.txt` 的 hunk 没有打上并不必然是问题。
+我们对 patch 目录中每个 `.preplumed`/patched 文件之间的新增行做了逐行核对：
 
-干净源码测试显示，GROMACS 2025.5 上游已经包含该 CMake hunk 的结构，因此 patch 会报告 `Ignoring previously applied (or reversed) patch`，而其他 PLUMED 相关 hunk 可以应用。
+| 项目版本 | 使用的 PLUMED patch | 新增行 | patch 后文件中存在 | 缺失 |
+| --- | --- | ---: | ---: | ---: |
+| 2023.5 | 2023.5 | 685 | 685 | 0 |
+| 2024.6 | 2024.3 | 619 | 619 | 0 |
+| 2025.5 | 2025.0 | 51 | 50 | 1 |
 
-但 patch 过程出现 `.rej` 仍必须检查，因为 `local/plumed/mpi5/lib/plumed/scripts/patch.sh` 没有用 `set -e`，部分 patch reject 不一定会让 task 失败。
+2023.5 的 15 个文件完全一致。2024.6 的 15 个 PLUMED hunk 全部可在当前 `.preplumed` 基础上 dry-run 应用；其中 `sim_util.cpp`、`md.cpp` 和 `decidegpuusage.cpp` 仅因 GROMACS 2024.3 到 2024.6 的上游上下文变化而字节不同。
 
-当前配置改用 GROMACS 2023.5，并使用同版本的 `plumed-patch -e gromacs-2023.5 -p`，这是更稳妥的组合。
+2025.5 唯一缺失的是注释
+`# gmx_manage_plumed() - MOVED EARLIER (before add_subdirectory(applied_forces))`。
+实际功能代码已经存在于 `gromacs-2025.5/mpi5/src/gromacs/CMakeLists.txt:73` 的 `gmx_manage_plumed()` 和 `:464` 的 `target_link_libraries(libgromacs PRIVATE plumedgmx)`，因此没有缺失功能内容。
+
+2025.5 仍会留下
+`gromacs-2025.5/mpi5/src/gromacs/CMakeLists.txt.rej`，因为该版本原始源码已经包含 PLUMED patch 要移动的 CMake 结构。
+这不是功能缺失，但 patch 过程并不干净，必须检查 `.rej`。
+PLUMED 的 `patch.sh` 在 `plumed-2.10.1/mpi5/patches/patch.sh:310-317` 没有检查 `patch` 的退出状态，因此 `_p_gromacs` task 成功不能单独证明没有 reject。
 
 ## MdrunOutputTests
 
