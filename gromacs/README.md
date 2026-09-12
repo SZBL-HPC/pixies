@@ -348,6 +348,24 @@ pixi run cmake --build . --parallel 1 2>&1 | tee make.log
 
 判断真正的构建失败，应查找 `error:`、`fatal error`、`undefined reference` 或 `FAILED`，并以 `make` 的最终退出码为准。
 
+## GROMACS GPU/MPI Patch
+
+当前 GROMACS 2023.5 使用的 GPU/MPI 修复对应 upstream commit
+`0f7ac8c9984145cd7a7ba15e6833ef6a4761ffdc`，标题为
+`Fix building with GPUs and GMX_THREAD_MPI=OFF`，用于修复
+`GMX_THREAD_MPI=OFF` 时 CUDA 源码中未受保护的 MPI 调用。
+
+该 commit 首次进入正式 release 是 **GROMACS 2024.3**（2024-08-29）。
+GROMACS 2024.2 尚未包含该 commit，2024.3 及之后的 release 已包含。
+上游 commit：
+`https://github.com/gromacs/gromacs/commit/0f7ac8c9984145cd7a7ba15e6833ef6a4761ffdc`。
+
+当前 2023.5 patch 文件为该 commit 的 backport：
+`patches/gromacs_2023.5/0f7ac8c9984145cd7a7ba15e6833ef6a4761ffdc-fix-gpu-thread-mpi-off.patch`。
+2023.5 的源码结构与上游 commit 时的版本不同，因此 patch 只应用
+`pme_gpu_grid.cu` 和 `mdgraph_gpu_impl.cu` 中适用于 2023.5 的 CUDA guard；
+上游两个 NVSHMEM 相关 `.cpp` hunk 不能直接套用。
+
 ## PLUMED Patch 版本
 
 `plumed-patch` 使用上下文 diff，并不会对 GROMACS 版本做严格的完整版本校验。
