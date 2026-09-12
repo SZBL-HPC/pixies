@@ -11,7 +11,7 @@ OpenMPI 使用 conda-forge `mpi-external` label 中的 external package，实际
 在包含 `hpc/` 和 `output/` 的项目目录中执行：
 
 ```bash
-cp -srv hpc/ /path/to/target
+cp -Lrv hpc/ /path/to/target
 cd /path/to/target
 pixi add `readlink -f output/linux-64/gromacs-plumed-2023.5-mpi_openmpi_cuda_0.conda`
 pixi install

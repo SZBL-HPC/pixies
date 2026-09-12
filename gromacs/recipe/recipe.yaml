@@ -88,7 +88,6 @@ requirements:
         - cuda-cudart >=12.4,<13
         # The CUDA 12.4 cuFFT ABI is published as libcufft 11.2.x.
         - libcufft >=11.2,<11.3
-        - __cuda
     - if: gromacs_variant == "ocl"
       then:
         - ocl-icd
