@@ -77,7 +77,7 @@ depends-on = [
 ]
 cmd = "bash scripts/plumed-mdrun-test.sh {{ version }} {{ pixi.environment.name }}"
 
-[tasks.plumed-hrex-test]
+[feature.mpi_task.tasks.plumed-hrex-test]
 description = "Run a minimal PLUMED Hamiltonian replica-exchange test."
 args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
 depends-on = [
@@ -248,8 +248,8 @@ dependencies = { fftw = { build = "mpi_*" }, openmpi = ">=5.0.8,<6" }
 openmpi = { build = "external_*" }
 
 [environments]
-mpi5 = ["mpi"]
-mpis = ["mpi-slurm"]
+mpi5 = ["mpi_task", "mpi"]
+mpis = ["mpi_task", "mpi-slurm"]
 
 # Activation inheritance order:
 # default feature -> target -> feature target -> environment override.
