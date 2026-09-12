@@ -38,11 +38,8 @@ cmd = """
         --exclude='plumed-2.10.1/src/include/plumed' \
         -C "$plumed_dir" \
     && cd "$plumed_dir" \
-    && ./configure --prefix="$plumed_prefix" \
-        --enable-rpath \
-        --enable-zlib --enable-gsl --enable-fftw \
-        $PLUMEDCONF \
-    && make -C src install LDFLAGS="$LDFLAGS" \
+    && bash "$PIXI_PROJECT_ROOT/scripts/build-plumed.sh" \
+        "$plumed_prefix" "{{ pixi.environment.name }}" "$PWD" \
     && rm -rf src/include/plumed
 """
 outputs = [
@@ -71,6 +68,22 @@ cmd = """
         --natoms 10 \
         --nsteps 100
 """
+
+[tasks.plumed-mdrun-test]
+description = "Run a minimal GROMACS mdrun with PLUMED for the active environment."
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+depends-on = [
+    { task = "build", args = ["{{ version }}"] },
+]
+cmd = "bash scripts/plumed-mdrun-test.sh {{ version }} {{ pixi.environment.name }}"
+
+[tasks.plumed-hrex-test]
+description = "Run a minimal PLUMED Hamiltonian replica-exchange test."
+args = [{ arg = "version", default = "2023.5", choices = ["2023.5", "2024.6", "2025.5", "2026.3"] }]
+depends-on = [
+    { task = "build", args = ["{{ version }}"] },
+]
+cmd = "bash scripts/plumed-hrex-test.sh {{ version }} {{ pixi.environment.name }}"
 
 [tasks._p_gromacs]
 description = "Patch GROMACS with the PLUMED build for the active Pixi environment."

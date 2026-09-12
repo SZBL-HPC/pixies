@@ -142,6 +142,30 @@ pixi run build 2026.3
 pixi run -e mpi5 plumed-benchmark
 ```
 
+验证 GROMACS 与 PLUMED 的实际 `mdrun -plumed` 联动：
+
+```bash
+pixi run -e mpi5 plumed-mdrun-test 2023.5
+pixi run -e mpi5 plumed-mdrun-test 2024.6
+pixi run -e mpi5 plumed-mdrun-test 2025.5
+```
+
+该 task 调用 `scripts/plumed-mdrun-test.sh`，生成隔离在 `.pixi/plumed-gromacs/<environment>/<version>/` 下的两原子测试系统，先执行 `grompp`，再执行 `gmx_mpi mdrun -plumed plumed.dat`，最后检查 PLUMED 生成的 `COLVAR`。脚本也可以直接运行：
+
+```bash
+./scripts/plumed-mdrun-test.sh 2023.5 mpi5
+```
+
+验证 PLUMED Hamiltonian replica exchange（HREX）：
+
+```bash
+pixi run -e mpi5 plumed-hrex-test 2023.5
+```
+
+该 task 调用 `scripts/plumed-hrex-test.sh`，生成两个相同的测试拓扑，在 `replica0/` 和 `replica1/` 中分别生成 `topol.tpr`，再使用 `mpiexec` 执行 `gmx_mpi mdrun -multidir replica0 replica1 -replex 1 -hrex -plumed plumed.dat`。脚本会先检查目标 `mdrun -h` 是否提供 `-[no]hrex`；不支持该选项的 GROMACS 版本会明确退出，不会误报测试成功。
+
+当前 PLUMED 2.10.1 patch 后的 2023.5 和 2024.6 binary 提供 `-[no]hrex`，2025.5 binary 不提供；因此实际能力以 binary help 为准，而不是只按 GROMACS 版本号判断。官方 HREX 说明见 [Using Hamiltonian replica exchange with GROMACS](https://www.plumed.org/doc-v2.9/user-doc/html/hrex.html)。
+
 不要直接运行不带参数的 `plumed benchmark`，因为 PLUMED 默认读取当前目录的 `plumed.dat`；项目根目录没有这个输入文件时会以 `file plumed.dat cannot found` 失败。需要使用自定义输入时，显式传入 `--plumed <path>`。
 
 激活环境会把 `local/bin` 加入 `PATH`，并加载 `local/bin/GMXRC.bash`。
