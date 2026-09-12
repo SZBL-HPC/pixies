@@ -170,6 +170,22 @@ pixi run -e mpi5 plumed-hrex-test 2023.5
 
 激活环境会把 `local/bin` 加入 `PATH`，并加载 `local/bin/GMXRC.bash`。
 
+## Conda Recipe
+
+`recipe/` 使用 Rattler-Build v1 将 PLUMED 2.10.1 和 GROMACS 2023.5 打包为一个 `gromacs-plumed` conda package。当前提供 Linux x86_64 的三个 Open MPI 变体：`mpi_openmpi_cuda`、`mpi_openmpi_d` 和 `mpi_openmpi_ocl`。
+
+`conda` task 只定义在 `target.linux-64`，本机 macOS 上不可执行。它在 t630 上通过 Pixi 临时运行 `rattler-build`，并使用 `__glibc=2.17`、`__linux=3.10` 和 `__cuda=12.4` 的 virtual package overrides：
+
+```bash
+pixi run conda
+```
+
+recipe 的构建工具链固定为 GCC/G++ 13.4、sysroot 2.17、CMake 3.31.8 和 Make 4.4.1。CUDA compiler、toolkit 和 runtime 接受 `12.4 <= version < 13`；GROMACS 2023.5 所需的 cuFFT ABI 使用 `libcufft 11.2.x`，因此 recipe 将 `libcufft` 限制在 `>=11.2,<11.3`，而不是把库名版本误当成 CUDA toolkit 版本。
+
+构建输出位于 `output/linux-64/`。recipe 的构建和 package tests 已在 t630 通过，测试分别运行对应的 `gmx_mpi* -version`，并验证 `plumed --is-installed`、`plumed info --version` 和 `plumed --has-mpi`。
+
+构建时使用 conda-forge 的 Open MPI 5。若运行环境需要使用集群本地 Open MPI 5，可以使用 conda-forge 的 `mpi-external` label 提供 `openmpi` external package，再把本地 MPI 的 `bin` 和 `lib` 放入运行环境；不要将 `openmpi-mpicc` 等编译器 metapackage 作为 recipe 依赖。
+
 ## DGROMACS 参数
 
 使用 target-specific activation environment 设置 `DGROMACS_GPU`、`DGROMACS_GPU_Toolchain`，再由公共的 `DGROMACS_Common` 补充默认 suffix、PLUMED 和 HWLOC 参数；`_mk_gromacs` 的 Jinja 条件决定 `-DGMX_MPI=OFF/ON`、是否加入 `-DGMXAPI=OFF`，environment 决定 standard build 的 suffix，task 根据 `suffix` 参数生成 binary/library suffix，安装前缀由版本参数直接传给 CMake。

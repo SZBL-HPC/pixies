@@ -1,0 +1,127 @@
+schema_version: 1
+
+context:
+  name: gromacs-plumed
+  version: "2023.5"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - path: ../pkg/gromacs-2023.5.tar.gz
+    use_gitignore: false
+    sha256: 9cc491d3601a5fe0ec0de727e4432c34877f596fe8a463d4cf0f0f53fb34d08b
+    target_directory: gromacs
+    patches:
+      - ../patches/gromacs_2023.5/0f7ac8c9984145cd7a7ba15e6833ef6a4761ffdc-fix-gpu-thread-mpi-off.patch
+  - path: ../pkg/plumed-src-2.10.1.tgz
+    use_gitignore: false
+    sha256: 3679652608cac7da083cfe3a5b164122d6869ac4fbd0e8983a1501b815b25fdf
+    target_directory: plumed
+
+build:
+  number: 0
+  string: mpi_${{ mpi }}_${{ gromacs_variant }}_${{ build_number }}
+  skip:
+    - target_platform != "linux-64"
+  script:
+    file: build.sh
+    env:
+      GROMACS_MPI: ${{ mpi }}
+      GROMACS_VARIANT: ${{ gromacs_variant }}
+  variant:
+    use_keys:
+      - mpi
+      - gromacs_variant
+      - c_compiler_version
+      - cxx_compiler_version
+      - c_stdlib_version
+  dynamic_linking:
+    rpaths:
+      - lib/
+    binary_relocation: true
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake >=3.31.8,<3.32
+    - gawk
+    - make >=4.4.1,<4.5
+    - perl
+    - pkg-config
+    - if: gromacs_variant == "cuda"
+      then:
+        - cuda-compiler >=12.4,<13
+  host:
+    - ${{ mpi }}
+    - fftw
+    - gsl >=2.8
+    - libblas
+    - libcblas
+    - liblapack
+    - libopenblas
+    - libgomp
+    - libhwloc
+    - zlib
+    - if: gromacs_variant == "cuda"
+      then:
+        - cuda-toolkit >=12.4,<13
+    - if: gromacs_variant == "ocl"
+      then:
+        - ocl-icd
+  run:
+    - ${{ mpi }}
+    - fftw
+    - gsl >=2.8
+    - libblas
+    - libcblas
+    - liblapack
+    - libopenblas
+    - libgomp
+    - libhwloc
+    - zlib
+    - if: gromacs_variant == "cuda"
+      then:
+        - cuda-cudart >=12.4,<13
+        # The CUDA 12.4 cuFFT ABI is published as libcufft 11.2.x.
+        - libcufft >=11.2,<11.3
+        - __cuda
+    - if: gromacs_variant == "ocl"
+      then:
+        - ocl-icd
+
+tests:
+  - script:
+      - if: gromacs_variant == "cuda"
+        then:
+          - gmx_mpi -version
+      - if: gromacs_variant == "d"
+        then:
+          - gmx_mpi_d -version
+      - if: gromacs_variant == "ocl"
+        then:
+          - gmx_mpi_ocl -version
+      - plumed --is-installed
+      - plumed info --version
+      - plumed --has-mpi
+
+about:
+  homepage: https://www.gromacs.org/
+  repository: https://github.com/gromacs/gromacs
+  documentation: https://manual.gromacs.org/2023.5/
+  license: LGPL-2.1-or-later AND LGPL-3.0-or-later
+  license_file:
+    - gromacs/COPYING
+    - plumed/COPYING.LESSER
+  summary: GROMACS 2023.5 with PLUMED 2.10.1 and OpenMPI support
+  description: |
+    GROMACS 2023.5 patched and linked with PLUMED 2.10.1. The recipe
+    provides OpenMPI CUDA, CPU double-precision, and OpenCL variants for
+    Linux x86_64 clusters.
+
+extra:
+  recipe-maintainers:
+    - szbl-hpc
