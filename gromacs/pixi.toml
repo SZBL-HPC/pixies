@@ -39,10 +39,10 @@ cmd = """
         -C "$plumed_dir" \
     && cd "$plumed_dir" \
     && ./configure --prefix="$plumed_prefix" \
-            --enable-rpath \
-            --enable-zlib --enable-gsl --enable-fftw \
-            --disable-python --disable-pycv \
-    && make -C src install \
+        --enable-rpath \
+        --enable-zlib --enable-gsl --enable-fftw \
+        $PLUMEDCONF \
+    && make -C src install LDFLAGS="$LDFLAGS" \
     && rm -rf src/include/plumed
 """
 outputs = [
@@ -50,6 +50,27 @@ outputs = [
     "local/plumed/{{ pixi.environment.name }}/bin/plumed-config",
     "local/plumed/{{ pixi.environment.name }}/bin/plumed-patch",
 ]
+
+[tasks.plumed-benchmark]
+description = "Run a small PLUMED benchmark for the active Pixi environment."
+depends-on = [
+    { task = "_mk_plumed", args = ["{{ pixi.environment.name }}"] },
+]
+cmd = """
+    plumed_bin="$PIXI_PROJECT_ROOT/local/plumed/{{ pixi.environment.name }}/bin/plumed" \
+    && benchmark_dir="$PIXI_PROJECT_ROOT/.pixi/plumed-benchmark/{{ pixi.environment.name }}" \
+    && mkdir -p "$benchmark_dir" \
+    && printf '%s\\n' \
+        'd1: DISTANCE ATOMS=1,2' \
+        'd2: DISTANCE ATOMS=2,3' \
+        'PRINT ARG=d1,d2 FILE=COLVAR' \
+        > "$benchmark_dir/plumed.dat" \
+    && cd "$benchmark_dir" \
+    && "$plumed_bin" benchmark \
+        --plumed plumed.dat \
+        --natoms 10 \
+        --nsteps 100
+"""
 
 [tasks._p_gromacs]
 description = "Patch GROMACS with the PLUMED build for the active Pixi environment."
@@ -237,6 +258,7 @@ DGROMACS_GPU_Toolchain = """ \
 FI_PROVIDER = "tcp"
 CC = "/usr/bin/clang"
 CXX = "/usr/bin/clang++"
+PLUMEDCONF = "--disable-python --disable-pycv"
 
 [target.linux-64.activation.env]
 MAKEFLAGS = "-j8"
@@ -246,6 +268,7 @@ DGROMACS_GPU_Toolchain = """ \
 -DCUDA_NVCC_EXECUTABLE=$CONDA_PREFIX/bin/nvcc \
 -DCMAKE_CUDA_COMPILER=$CONDA_PREFIX/bin/nvcc \
 """
+PLUMEDCONF = ""
 
 [feature.mpi-slurm.target.linux-64.activation]
 scripts = ["activate_mpi.sh"]

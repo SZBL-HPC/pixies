@@ -22,6 +22,8 @@ PLUMED 的安装目录也按环境隔离；GROMACS 的安装目录目前按版�
 `_mk_plumed` 将 PLUMED 2.10.1 解压到 `plumed-2.10.1/{{ pixi.environment.name }}/`，执行 `./configure --disable-python --disable-pycv` 和 `make -C src install`，并安装到 `local/plumed/{{ pixi.environment.name }}/`。
 解压时会排除 archive 中会触发 Pixi 循环遍历错误的 `src/include/plumed -> ../` 符号链接。
 
+`plumed-benchmark` 依赖当前 Pixi 环境的 `_mk_plumed`，在 `.pixi/plumed-benchmark/{{ pixi.environment.name }}/` 生成最小的 `plumed.dat`，然后运行 100 步、10 个原子的 PLUMED benchmark；输出文件也留在该临时目录，不会污染项目根目录。
+
 `_p_gromacs` 将 `gromacs-{{ version }}` 解压到 `gromacs-{{ version }}/{{ pixi.environment.name }}/`，并使用当前环境的 `local/plumed/{{ pixi.environment.name }}/bin/plumed-patch` 执行 patch。
 
 `_mk_gromacs` 接收 `version`、`variant` 和 `suffix` 参数；`variant` 可取 `single`、`double` 或 `ocl`。
@@ -132,6 +134,14 @@ pixi run build 2024.6
 pixi run build 2025.5
 pixi run build 2026.3
 ```
+
+验证当前环境的 PLUMED 是否已正确构建和链接：
+
+```bash
+pixi run -e mpi5 plumed-benchmark
+```
+
+不要直接运行不带参数的 `plumed benchmark`，因为 PLUMED 默认读取当前目录的 `plumed.dat`；项目根目录没有这个输入文件时会以 `file plumed.dat cannot found` 失败。需要使用自定义输入时，显式传入 `--plumed <path>`。
 
 激活环境会把 `local/bin` 加入 `PATH`，并加载 `local/bin/GMXRC.bash`。
 
