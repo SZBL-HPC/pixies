@@ -1,0 +1,146 @@
+From 0f7ac8c9984145cd7a7ba15e6833ef6a4761ffdc Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Szil=C3=A1rd=20P=C3=A1ll?= <pall.szilard@gmail.com>
+Date: Mon, 22 Jul 2024 18:42:29 +0200
+Subject: [PATCH] Fix building with GPUs and GMX_THREAD_MPI=OFF
+
+Backport the CUDA source changes from upstream commit
+0f7ac8c9984145cd7a7ba15e6833ef6a4761ffdc to GROMACS 2023.5.
+The later NVSHMEM-only source changes from that commit are not present
+in this release.
+
+Fixes #5112
+---
+ src/gromacs/ewald/pme_gpu_grid.cu     |  2 ++
+ src/gromacs/mdlib/mdgraph_gpu_impl.cu | 20 ++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/src/gromacs/ewald/pme_gpu_grid.cu b/src/gromacs/ewald/pme_gpu_grid.cu
+index 720b38fcc48..c3c6627de9c 100644
+--- a/src/gromacs/ewald/pme_gpu_grid.cu
++++ b/src/gromacs/ewald/pme_gpu_grid.cu
+@@ -801,7 +801,9 @@ static void receiveAndSend(DeviceBuffer<float> sendBuf,
+                            MPI_Comm            comm)
+{
+    // send data to dest rank and recv from src rank
++#if GMX_MPI
+    MPI_Irecv(recvBuf, recvCount, MPI_FLOAT, src, tag, comm, recvRequest);
+ 
+    MPI_Isend(sendBuf, sendCount, MPI_FLOAT, dest, tag, comm, sendRequest);
++#endif
+}
+diff --git a/src/gromacs/mdlib/mdgraph_gpu_impl.cu b/src/gromacs/mdlib/mdgraph_gpu_impl.cu
+index 28398826f27..fb1c5ed834e 100644
+--- a/src/gromacs/mdlib/mdgraph_gpu_impl.cu
++++ b/src/gromacs/mdlib/mdgraph_gpu_impl.cu
+@@ -75,9 +75,11 @@ MdGpuGraph::Impl::Impl(const DeviceStreamManager& deviceStreamManager,
+ 
+    if (havePPDomainDecomposition_)
+    {
++#    if GMX_MPI
+        MPI_Barrier(mpiComm_);
+    MPI_Comm_size(mpiComm_, &ppSize_);
+    MPI_Comm_rank(mpiComm_, &ppRank_);
++#    endif
+    }
+ 
+    // Avoid update for graphs involving inter-GPU transfers if running on old driver
+@@ -117,24 +119,28 @@ void MdGpuGraph::Impl::enqueueEventFromAllPpRanksToRank0Stream(GpuEventSynchroni
+     {
+         if (ppRank_ == remotePpRank)
+         {
++#    if GMX_MPI
+             // send event to rank 0
+             MPI_Send(&event,
+                      sizeof(GpuEventSynchronizer*), //NOLINT(bugprone-sizeof-expression)
+                      MPI_BYTE,
+                      0,
+                      0,
+                      mpiComm_);
++#    endif
+         }
+         else if (ppRank_ == 0)
+         {
+             // rank 0 enqueues recieved event
+             GpuEventSynchronizer* eventToEnqueue;
++#    if GMX_MPI
+             MPI_Recv(&eventToEnqueue,
+                      sizeof(GpuEventSynchronizer*), //NOLINT(bugprone-sizeof-expression)
+                      MPI_BYTE,
+                      remotePpRank,
+                      0,
+                      mpiComm_,
+                      MPI_STATUS_IGNORE);
++#    endif
+             eventToEnqueue->enqueueWaitEvent(stream);
+         }
+@@ -151,7 +157,9 @@ void MdGpuGraph::Impl::enqueueRank0EventToAllPpStreams(GpuEventSynchronizer* eve
+ {
+     if (havePPDomainDecomposition_)
+     {
++#    if GMX_MPI
+         // NOLINTNEXTLINE(bugprone-sizeof-expression)
+         MPI_Bcast(&event, sizeof(GpuEventSynchronizer*), MPI_BYTE, 0, mpiComm_);
++#    endif
+     }
+     event->enqueueWaitEvent(stream);
+@@ -157,9 +157,11 @@ void MdGpuGraph::Impl::disableForDomainIfAnyPpRankHasCpuForces(bool disableGraph
+         // If disabled on any domain, disable on all domains
++#    if GMX_MPI
+         MPI_Allreduce(&disableGraphAcrossAllPpRanks,
+                       &disableGraphAcrossAllPpRanks_,
+                       sizeof(bool),
+                       MPI_BYTE,
+                       MPI_SUM,
+                       mpiComm_);
++#    endif
+     }
+ }
+@@ -211,6 +221,8 @@ void MdGpuGraph::Impl::startRecord(GpuEventSynchronizer* xReadyOnDeviceEvent)
+     wallcycle_sub_start(wcycle_, WallCycleSubCounter::MdGpuGraphWaitBeforeCapture);
+     if (havePPDomainDecomposition_)
+     {
++#    if GMX_MPI
+         MPI_Barrier(mpiComm_);
++#    endif
+     }
+     wallcycle_sub_stop(wcycle_, WallCycleSubCounter::MdGpuGraphWaitBeforeCapture);
+@@ -250,8 +262,10 @@ void MdGpuGraph::Impl::startRecord(GpuEventSynchronizer* xReadyOnDeviceEvent)
+        enqueueRank0EventToAllPpStreams(
+                helperEvent_.get(), deviceStreamManager_.stream(gmx::DeviceStreamType::NonBondedLocal));
+        // The synchronization below should not be needed, see #4674
++#    if GMX_MPI
+        MPI_Barrier(mpiComm_);
++#    endif
+ 
+        // Fork NB non-local stream from NB local stream on each rank
+        helperEvent_->markEvent(deviceStreamManager_.stream(gmx::DeviceStreamType::NonBondedLocal));
+        helperEvent_->enqueueWaitEvent(deviceStreamManager_.stream(gmx::DeviceStreamType::NonBondedNonLocal));
+@@ -338,7 +352,9 @@ void MdGpuGraph::Impl::endRecord()
+     // Sync all tasks before closing timing region, since the graph capture should be treated as a collective operation for timing purposes.
+     if (havePPDomainDecomposition_)
+     {
++#    if GMX_MPI
+         MPI_Barrier(mpiComm_);
++#    endif
+     }
+     wallcycle_sub_stop(wcycle_, WallCycleSubCounter::MdGpuGraphCapture);
+     wallcycle_stop(wcycle_, WallCycleCounter::MdGpuGraph);
+@@ -420,7 +436,9 @@ void MdGpuGraph::Impl::createExecutableGraph(bool forceGraphReinstantiation)
+     // Sync all tasks before closing timing region, since the graph instantiate or update should be treated as a collective operation for timing purposes.
+     if (havePPDomainDecomposition_)
+     {
++#    if GMX_MPI
+         MPI_Barrier(mpiComm_);
++#    endif
+     }
+     wallcycle_sub_stop(wcycle_, WallCycleSubCounter::MdGpuGraphInstantiateOrUpdate);
+     wallcycle_stop(wcycle_, WallCycleCounter::MdGpuGraph);
+@@ -437,6 +455,8 @@ void MdGpuGraph::Impl::launchGraphMdStep(GpuEventSynchronizer* xUpdatedOnDeviceE
+     wallcycle_sub_start(wcycle_, WallCycleSubCounter::MdGpuGraphWaitBeforeLaunch);
+     if (havePPDomainDecomposition_)
+     {
++#    if GMX_MPI
+         MPI_Barrier(mpiComm_);
++#    endif
+     }
+     wallcycle_sub_stop(wcycle_, WallCycleSubCounter::MdGpuGraphWaitBeforeLaunch);
