@@ -1,0 +1,14 @@
+[workspace]
+channels = ["conda-forge/label/mpi-external", "conda-forge"]
+name = "gromacs-plumed-hpc"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[dependencies]
+openmpi = { version = ">=5.0.8,<6", build = "external_*" }
+
+[activation]
+scripts = ["activate_mpi.sh"]
+
+[activation.env]
+GMX_FORCE_GPU_AWARE_MPI = "1"
