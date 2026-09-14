@@ -37,6 +37,9 @@ pixi install
 `test-hrex.sh` 运行两个 replica 的 PLUMED Hamiltonian replica exchange，要求 GROMACS binary 提供 `mdrun -hrex`；当前 2023.5 和 2024.6 支持，2025.5 不支持。
 测试输入和输出默认写入目标目录下的 `.test/`，可以通过 `HPC_TEST_ROOT` 指定其他目录。
 
+Linux CUDA package 的构建配置针对 V100、A100、RTX 4090D 和 H200 设置 `sm_70;sm_80;sm_89;sm_90`，对应的 CMake 参数为 `-DGMX_CUDA_TARGET_SM=70;80;89;90`。
+该参数是手动架构列表，会替代 GROMACS 2023.5 默认列表；需要重新构建并安装 package 才能更新已部署的 GPU device code。CUDA toolkit/runtime 仍需与运行节点的 NVIDIA driver 匹配。
+
 ## HREX 原理与运行步骤
 
 HREX（Hamiltonian Replica Exchange，Hamiltonian replica exchange）同时运行多个相互关联的分子动力学模拟。每个模拟称为一个 **replica**，它们使用相同的初始体系和温度，但使用略有不同的 Hamiltonian（势能函数）。在本目录的 demo 中，4 个 replica 使用不同的 `lambda`：`1.0`、`0.9`、`0.8` 和 `0.7`；PLUMED `partial_tempering` 根据这些值生成各自的 topology。

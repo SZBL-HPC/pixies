@@ -229,10 +229,26 @@ Linux `gpu-linux-64` 和 `centos75` 当前使用：
 
 ```text
 -DGMX_GPU=CUDA
+-DGMX_CUDA_TARGET_SM=70;80;89;90
 -DCMAKE_INSTALL_LIBDIR=lib
 -DCUDA_NVCC_EXECUTABLE=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc
 -DCMAKE_CUDA_COMPILER=$PIXI_PROJECT_ROOT/.pixi/envs/default/bin/nvcc
 ```
+
+CUDA 架构列表按当前服务器需要的四类 GPU 显式设置：
+
+| GPU | Compute Capability | CUDA target |
+| --- | --- | --- |
+| NVIDIA V100 | 7.0 | `sm_70` |
+| NVIDIA A100 | 8.0 | `sm_80` |
+| NVIDIA RTX 4090D | 8.9 | `sm_89` |
+| NVIDIA H200 | 9.0 | `sm_90` |
+
+在 GROMACS 2023.5 中，设置 `GMX_CUDA_TARGET_SM` 会进入手动架构配置分支，列表中的值会替代默认架构列表，而不是在默认列表上追加。
+`pixi.toml` 的 `DGROMACS_GPU` 和 `recipe/build.sh` 的 CUDA variant 均显式设置 `70;80;89;90`，使同一个 CUDA binary 为这四种 GPU 生成对应的 native device code。
+修改架构列表后需要重新配置、编译并安装或打包；当前 Pixi task 使用 `cmake --fresh` 清除旧的 CMake 配置。现有已安装 package 不会因修改构建参数而自动更新。
+
+该设置只决定 GPU device code 的目标架构，CUDA toolkit/runtime 仍必须与运行节点的 NVIDIA driver 兼容；当前 recipe 的 CUDA 依赖范围是 `12.4 <= version < 13`。
 
 Linux target 的 `_batch_mk_gromacs` 第三个依赖会让 `_mk_gromacs` 覆盖 GPU 后端为 OpenCL，并额外使用：
 

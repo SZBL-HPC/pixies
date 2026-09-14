@@ -68,6 +68,7 @@ case "${GROMACS_VARIANT}" in
         export PATH="${cuda_target}/bin:${cuda_target}/nvvm/bin:${BUILD_PREFIX}/nvvm/bin:${PATH}"
         cmake_args+=(
             -DGMX_GPU=CUDA
+            '-DGMX_CUDA_TARGET_SM=70;80;89;90'
             -DCMAKE_CUDA_COMPILER="${BUILD_PREFIX}/bin/nvcc"
             -DCMAKE_CXX_FLAGS="-I${PREFIX}/include"
         )

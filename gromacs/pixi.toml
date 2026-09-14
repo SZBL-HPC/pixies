@@ -289,7 +289,7 @@ PLUMEDCONF = "--disable-python --disable-pycv"
 
 [target.linux-64.activation.env]
 MAKEFLAGS = "-j8"
-DGROMACS_GPU = "-DGMX_GPU=CUDA"
+DGROMACS_GPU = "-DGMX_GPU=CUDA -DGMX_CUDA_TARGET_SM=70;80;89;90"
 DGROMACS_GPU_Toolchain = """ \
 -DCMAKE_INSTALL_LIBDIR=lib \
 -DCUDA_NVCC_EXECUTABLE=$CONDA_PREFIX/bin/nvcc \
