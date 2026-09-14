@@ -8,7 +8,7 @@ version = "0.1.0"
 openmpi = { version = ">=5.0.8,<6", build = "external_*" }
 
 [activation]
-scripts = ["activate_mpi.sh"]
+scripts = ["activate_mpi.sh", ".pixi/envs/default/bin/GMXRC.bash"]
 
 [activation.env]
 GMX_FORCE_GPU_AWARE_MPI = "1"
