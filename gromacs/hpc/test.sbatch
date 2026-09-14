@@ -28,7 +28,7 @@ set -u
 DATA_DIR="$ROOT/hrex-data"
 RUN_DIR="$ROOT/test/hrex"
 
-export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-16}"
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK}"
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 export GMX_PME_NUM_THREADS=1
