@@ -65,11 +65,21 @@ cmake_args=(
 case "${GROMACS_VARIANT}" in
     cuda)
         cuda_target="${BUILD_PREFIX}/targets/x86_64-linux"
+        cuda_host_target="${PREFIX}/targets/x86_64-linux"
+        cuda_host="${BUILD_PREFIX}/bin/x86_64-conda-linux-gnu-c++"
+        export CUDA_NVCC_EXECUTABLE="${BUILD_PREFIX}/bin/nvcc"
+        export CUDAHOSTCXX="${cuda_host}"
+        unset NVCC_PREPEND_FLAGS NVCC_APPEND_FLAGS
         export PATH="${cuda_target}/bin:${cuda_target}/nvvm/bin:${BUILD_PREFIX}/nvvm/bin:${PATH}"
         cmake_args+=(
             -DGMX_GPU=CUDA
             '-DGMX_CUDA_TARGET_SM=70;80;89;90'
             -DCMAKE_CUDA_COMPILER="${BUILD_PREFIX}/bin/nvcc"
+            -DCMAKE_CUDA_HOST_COMPILER="${cuda_host}"
+            -DCUDA_HOST_COMPILER="${cuda_host}"
+            -DCUDA_TOOLKIT_ROOT_DIR="${cuda_target}"
+            -DCUDAToolkit_ROOT="${cuda_target}"
+            -DCUDA_NVCC_FLAGS="-I${cuda_host_target}/include"
             -DCMAKE_CXX_FLAGS="-I${PREFIX}/include"
         )
         ;;
