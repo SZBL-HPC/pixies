@@ -21,7 +21,7 @@ source:
     target_directory: plumed
 
 build:
-  number: 0
+  number: 1
   string: mpi_${{ mpi }}_${{ gromacs_variant }}_${{ build_number }}
   skip:
     - target_platform != "linux-64"
