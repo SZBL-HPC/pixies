@@ -215,7 +215,8 @@ cmd = """
         --recipe "$PIXI_PROJECT_ROOT/recipe" \
         --target-platform linux-64 \
         --channel conda-forge \
-        --log-style plain
+        --log-style plain \
+    && chmod 644 "$PIXI_PROJECT_ROOT"/output/linux-64/*
 """
 
 [dependencies]
