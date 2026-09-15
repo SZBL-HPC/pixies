@@ -13,11 +13,11 @@ OpenMPI 使用 conda-forge `mpi-external` label 中的 external package，实际
 ```bash
 cp -srv hpc/ /path/to/target
 cd /path/to/target
-pixi add `readlink -f output/linux-64/gromacs-plumed-2023.5-mpi_openmpi_cuda_0.conda`
+pixi add `readlink -f output/linux-64/gromacs-plumed-2023.5-mpi_openmpi_1.conda`
 pixi install
 ```
 
-上面的 `pixi add` 使用 CUDA 单精度 package；也可以替换为同一目录中的 `mpi_openmpi_d` 或 `mpi_openmpi_ocl` package。
+上面的 `pixi add` 安装包含 `gmx_mpi`、`gmx_mpi_d` 和 `gmx_mpi_ocl` 三个可执行文件的合并 package。
 `readlink -f` 需要在执行命令的目录中能够找到 `output/linux-64/`；如果 package 位于其他目录，可以直接把它替换为该 `.conda` 文件的绝对路径。
 
 安装后从目标目录运行 `pixi shell`，或使用 `pixi run` 执行已安装的 GROMACS 命令。
@@ -36,9 +36,6 @@ pixi install
 `test-mdrun.sh` 默认运行 CPU+MPI 测试，传入 `gpu` 时运行 CUDA GPU+MPI 测试。
 `test-hrex.sh` 运行两个 replica 的 PLUMED Hamiltonian replica exchange，要求 GROMACS binary 提供 `mdrun -hrex`；当前 2023.5 和 2024.6 支持，2025.5 不支持。
 测试输入和输出默认写入目标目录下的 `.test/`，可以通过 `HPC_TEST_ROOT` 指定其他目录。
-
-Linux CUDA package 的构建配置针对 V100、A100、RTX 4090D 和 H200 设置 `sm_70;sm_80;sm_89;sm_90`，对应的 CMake 参数为 `-DGMX_CUDA_TARGET_SM=70;80;89;90`。
-该参数是手动架构列表，会替代 GROMACS 2023.5 默认列表；需要重新构建并安装 package 才能更新已部署的 GPU device code。CUDA toolkit/runtime 仍需与运行节点的 NVIDIA driver 匹配。
 
 ## HREX 原理与运行步骤
 
@@ -63,3 +60,66 @@ sbatch /lustre/software/pixi/gromacs-plumed-hpc/test.sbatch
 ```
 
 脚本通过 `gromacs/hpc/pixi.toml` 激活集群 Open MPI 和 GROMACS 的 `GMXRC.bash`，因此命令直接使用 `gmx_mpi`，不需要额外的 `GMX_BIN` 变量。
+
+## gpu01 GPU 后端实测记录
+
+以下结果来自 2026-09-15 在 `gpu01` 上的实际运行。`gpu01` 有 2 张 Tesla V100-PCIE-32GB，Compute Capability 为 7.0，NVIDIA driver 为 `550.54.15`，driver 报告的 CUDA 版本为 `12.4`。
+
+### CUDA package
+
+`/lustre/software/pixi/gromacs-plumed-hpc2` 中安装的
+合并 package 使用 `gmx_mpi`，并包含 `gmx_mpi_d` 和 `gmx_mpi_ocl`；CUDA binary 包含 `sm_70`、`sm_80`、`sm_89` 和 `sm_90` 的 native device code。用 `cuobjdump` 检查 `libgromacs_mpi.so.8` 时没有发现 PTX fallback。
+
+使用集群 Open MPI 启动一个 MPI world 后，2 个 rank、2 张 V100、GPU PME 的测试成功：
+
+```bash
+mpirun -np 2 --map-by ppr:2:node:pe=16 --bind-to core \
+    gmx_mpi mdrun -s topol.tpr -nsteps 10 -ntomp 16 \
+    -pin off -nb gpu -pme gpu -gpu_id 01 \
+    -multidir replica0 replica1
+```
+
+输出确认 `2 GPUs selected`、2 个 MPI rank 分别使用两张 GPU，并正常写出最终坐标。这个测试也确认 OpenMPI 的 `mpirun` 可以正常工作，不需要 `rsh`。
+
+### OpenCL executable
+
+OpenCL package 的可执行文件是 `gmx_mpi_ocl`，不是 `gmx_mpi`。测试使用的安装目录为
+`/lustre/software/pixi/gromacs-plumed-hpc`。
+
+OCL 测试先遇到一个独立的 ICD loader 配置问题。Pixi 环境中的 `ocl-icd` 默认读取：
+
+```text
+/lustre/software/pixi/gromacs-plumed-hpc/.pixi/envs/default/etc/OpenCL/vendors
+```
+
+而 NVIDIA ICD 文件位于：
+
+```text
+/etc/OpenCL/vendors/nvidia.icd
+```
+
+因此需要在 batch 或运行命令前设置：
+
+```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
+```
+
+设置后，OpenCL loader 可以发现 2 张 V100，但 GROMACS 2023.5 自身的
+`src/gromacs/hardware/device_management_ocl.cpp:110-136` 会把 NVIDIA Volta
+标记为 `IncompatibleNvidiaVolta`，正常运行路径会拒绝该设备。
+
+可以用下面的环境变量跳过这项检查：
+
+```bash
+export GMX_GPU_DISABLE_COMPATIBILITY_CHECK=1
+```
+
+之前的绕过检查测试确实已经进入 GPU 计算阶段，输出确认 2 张 GPU 被映射到 2 个 MPI rank：
+
+```text
+PP:0,PME:0,PP:1,PME:1
+```
+
+但随后立即出现 LINCS warnings，最后 segmentation fault。也就是说，之前的错误不是 ICD 找不到设备，也不是 `mpirun` 失败；绕过检查后暴露的是 GROMACS 2023.5 OpenCL backend 在 NVIDIA Volta 上的运行时/数值不稳定问题。`GMX_GPU_DISABLE_COMPATIBILITY_CHECK` 只跳过保护性检查，不会修复 backend、driver 或 device code 的兼容性，因此不应作为生产运行方案。
+
+结论：CUDA package 已在 `gpu01` 上用 2 rank、2 GPU 和 GPU PME 验证成功；OpenCL package 只能通过 ICD 配置和兼容性检查绕过进入运行，但目前在 V100 上会在实际 MD 阶段失败。除非升级或修改 GROMACS 的 OpenCL Volta 支持，否则应优先使用 CUDA package 或 CPU package。

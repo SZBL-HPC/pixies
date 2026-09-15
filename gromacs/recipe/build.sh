@@ -5,7 +5,6 @@ set -euxo pipefail
 : "${SRC_DIR:?SRC_DIR is required}"
 : "${BUILD_PREFIX:?BUILD_PREFIX is required}"
 : "${GROMACS_MPI:?GROMACS_MPI is required}"
-: "${GROMACS_VARIANT:?GROMACS_VARIANT is required}"
 
 test "${GROMACS_MPI}" = openmpi
 test "${target_platform}" = linux-64
@@ -37,10 +36,8 @@ make -C src -j"${CPU_COUNT}" install
 cd "${gromacs_src}"
 "${PREFIX}/bin/plumed-patch" -e "gromacs-${PKG_VERSION}" -p
 
-gromacs_build="${BUILD_DIR}/gromacs-${GROMACS_VARIANT}"
-cmake_args=(
+common_cmake_args=(
     -S "${gromacs_src}"
-    -B "${gromacs_build}"
     -G "${CMAKE_GENERATOR}"
     -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_PREFIX_PATH="${PREFIX}"
@@ -58,12 +55,15 @@ cmake_args=(
     -DGMX_INSTALL_LEGACY_API=ON
     -DCMAKE_C_COMPILER="${CC}"
     -DCMAKE_CXX_COMPILER="${CXX}"
-    -DGMX_BINARY_SUFFIX=_mpi
-    -DGMX_LIBS_SUFFIX=_mpi
 )
 
-case "${GROMACS_VARIANT}" in
-    cuda)
+build_variant() {
+    local variant="$1"
+    local gromacs_build="${BUILD_DIR}/gromacs-${variant}"
+    local cmake_args=("${common_cmake_args[@]}" -B "${gromacs_build}" -DGMX_BINARY_SUFFIX=_mpi -DGMX_LIBS_SUFFIX=_mpi)
+
+    case "${variant}" in
+        cuda)
         cuda_target="${BUILD_PREFIX}/targets/x86_64-linux"
         cuda_host_target="${PREFIX}/targets/x86_64-linux"
         cuda_host="${BUILD_PREFIX}/bin/x86_64-conda-linux-gnu-c++"
@@ -83,7 +83,7 @@ case "${GROMACS_VARIANT}" in
             -DCMAKE_CXX_FLAGS="-I${PREFIX}/include"
         )
         ;;
-    d)
+        d)
         cmake_args+=(
             -DGMX_DOUBLE=ON
             -DGMX_GPU=OFF
@@ -91,7 +91,7 @@ case "${GROMACS_VARIANT}" in
             -DGMX_LIBS_SUFFIX=_mpi_d
         )
         ;;
-    ocl)
+        ocl)
         cmake_args+=(
             -DGMX_DOUBLE=OFF
             -DGMX_GPU=OpenCL
@@ -101,20 +101,23 @@ case "${GROMACS_VARIANT}" in
             -DGMX_LIBS_SUFFIX=_mpi_ocl
         )
         ;;
-    *)
-        printf 'Unknown GROMACS variant: %s\n' "${GROMACS_VARIANT}" >&2
-        exit 2
-        ;;
-esac
+        *)
+            printf 'Unknown GROMACS variant: %s\n' "${variant}" >&2
+            exit 2
+            ;;
+    esac
 
-cmake "${cmake_args[@]}"
-cmake --build "${gromacs_build}" --parallel "${CPU_COUNT}"
-cmake --install "${gromacs_build}"
+    cmake "${cmake_args[@]}"
+    cmake --build "${gromacs_build}" --parallel "${CPU_COUNT}"
+    cmake --install "${gromacs_build}"
+}
+
+build_variant cuda
+build_variant d
+build_variant ocl
 
 test -x "${PREFIX}/bin/plumed"
 test -x "${PREFIX}/bin/plumed-patch"
-case "${GROMACS_VARIANT}" in
-    d) test -x "${PREFIX}/bin/gmx_mpi_d" ;;
-    ocl) test -x "${PREFIX}/bin/gmx_mpi_ocl" ;;
-    cuda) test -x "${PREFIX}/bin/gmx_mpi" ;;
-esac
+test -x "${PREFIX}/bin/gmx_mpi"
+test -x "${PREFIX}/bin/gmx_mpi_d"
+test -x "${PREFIX}/bin/gmx_mpi_ocl"

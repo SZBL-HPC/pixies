@@ -172,7 +172,7 @@ pixi run -e mpi5 plumed-hrex-test 2023.5
 
 ## Conda Recipe
 
-`recipe/` 使用 Rattler-Build v1 将 PLUMED 2.10.1 和 GROMACS 2023.5 打包为一个 `gromacs-plumed` conda package。当前提供 Linux x86_64 的三个 Open MPI 变体：`mpi_openmpi_cuda`、`mpi_openmpi_d` 和 `mpi_openmpi_ocl`。
+`recipe/` 使用 Rattler-Build v1 将 PLUMED 2.10.1 和 GROMACS 2023.5 打包为一个 `gromacs-plumed` conda package。Linux x86_64 现在生成一个合并 package，内含 Open MPI CUDA、CPU double-precision 和 OpenCL 三套可执行文件：`gmx_mpi`、`gmx_mpi_d` 和 `gmx_mpi_ocl`。
 
 `conda` task 只定义在 `target.linux-64`，本机 macOS 上不可执行。它在 t630 上通过 Pixi 临时运行 `rattler-build`，并使用 `__glibc=2.17`、`__linux=3.10` 和 `__cuda=12.4` 的 virtual package overrides：
 

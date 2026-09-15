@@ -1,11 +1,6 @@
 mpi:
   - openmpi
 
-gromacs_variant:
-  - cuda
-  - d
-  - ocl
-
 c_compiler:
   - gcc
 c_compiler_version:

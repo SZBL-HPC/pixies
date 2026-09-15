@@ -22,18 +22,16 @@ source:
 
 build:
   number: 1
-  string: mpi_${{ mpi }}_${{ gromacs_variant }}_${{ build_number }}
+  string: mpi_${{ mpi }}_${{ build_number }}
   skip:
     - target_platform != "linux-64"
   script:
     file: build.sh
     env:
       GROMACS_MPI: ${{ mpi }}
-      GROMACS_VARIANT: ${{ gromacs_variant }}
   variant:
     use_keys:
       - mpi
-      - gromacs_variant
       - c_compiler_version
       - cxx_compiler_version
       - c_stdlib_version
@@ -52,9 +50,7 @@ requirements:
     - make >=4.4.1,<4.5
     - perl
     - pkg-config
-    - if: gromacs_variant == "cuda"
-      then:
-        - cuda-compiler >=12.4,<13
+    - cuda-compiler >=12.4,<13
   host:
     - ${{ mpi }}
     - fftw
@@ -66,12 +62,8 @@ requirements:
     - libgomp
     - libhwloc
     - zlib
-    - if: gromacs_variant == "cuda"
-      then:
-        - cuda-toolkit >=12.4,<13
-    - if: gromacs_variant == "ocl"
-      then:
-        - ocl-icd
+    - cuda-toolkit >=12.4,<13
+    - ocl-icd
   run:
     - ${{ mpi }}
     - fftw
@@ -83,26 +75,16 @@ requirements:
     - libgomp
     - libhwloc
     - zlib
-    - if: gromacs_variant == "cuda"
-      then:
-        - cuda-cudart >=12.4,<13
-        # The CUDA 12.4 cuFFT ABI is published as libcufft 11.2.x.
-        - libcufft >=11.2,<11.3
-    - if: gromacs_variant == "ocl"
-      then:
-        - ocl-icd
+    - cuda-cudart >=12.4,<13
+    # The CUDA 12.4 cuFFT ABI is published as libcufft 11.2.x.
+    - libcufft >=11.2,<11.3
+    - ocl-icd
 
 tests:
   - script:
-      - if: gromacs_variant == "cuda"
-        then:
-          - gmx_mpi -version
-      - if: gromacs_variant == "d"
-        then:
-          - gmx_mpi_d -version
-      - if: gromacs_variant == "ocl"
-        then:
-          - gmx_mpi_ocl -version
+      - gmx_mpi -version
+      - gmx_mpi_d -version
+      - gmx_mpi_ocl -version
       - plumed --is-installed
       - plumed info --version
       - plumed --has-mpi
@@ -117,8 +99,8 @@ about:
     - plumed/COPYING.LESSER
   summary: GROMACS 2023.5 with PLUMED 2.10.1 and OpenMPI support
   description: |
-    GROMACS 2023.5 patched and linked with PLUMED 2.10.1. The recipe
-    provides OpenMPI CUDA, CPU double-precision, and OpenCL variants for
+    GROMACS 2023.5 patched and linked with PLUMED 2.10.1. The package
+    provides OpenMPI CUDA, CPU double-precision, and OpenCL executables for
     Linux x86_64 clusters.
 
 extra:
