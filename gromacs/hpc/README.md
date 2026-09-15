@@ -50,6 +50,8 @@ HREX demo 的实际步骤如下：
 3. 先执行一次 `gmx_mpi grompp` 生成预处理 topology，再标记 Protein 的 22 个溶质原子，分别通过 `plumed partial_tempering` 生成 4 份 replica topology，并为每个 replica 生成自己的 `topol.tpr`。
 4. 使用 `-multidir replica0 replica1 replica2 replica3` 启动 4 个相互关联的模拟。每个目录对应一个 replica，MPI rank 数必须与目录数一致；本 demo 由 Slurm 分配双节点、每节点 2 个 task，每个 task 使用 16 个 OpenMP threads 和 1 张 GPU。
 5. `-replex 100` 表示每 100 个 MD step 尝试一次 replica exchange；`-hrex` 启用 Hamiltonian replica exchange，`-dlb no` 保证各 replica 的步进和交换保持同步，`-notunepme` 避免 GPU PME 自动调优造成交换初期的数值差异。
+
+`-hrex` 在当前 PLUMED-patched GROMACS 中要求同时提供 `-plumed`，并且运行时的 `plumed.dat` 不能是空文件。`plumed partial_tempering` 只负责预处理 replica topology；simple batch 脚本另外写入最小的 `DISTANCE`/`PRINT` PLUMED action。传入空 `plumed.dat` 会在第一次 replica exchange 的 `PLMD::GREX::savePositions()` 中卡在 MPI wait，而直接删除 `-plumed` 会触发 `-hrex requires -plumed`。
 6. 所有模拟完成后检查每个 `replica*/md.log`。模拟目录写入 `ROOT/test/hrex-${SLURM_JOB_ID}`，Slurm 日志和临时文件写入共享目录 `ROOT/tmp/`；`hrex-data/` 中的官方输入文件不会被覆盖。
 
 提交服务器上的 GPU demo：
