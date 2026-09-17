@@ -6,15 +6,23 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:2
 #SBATCH --export=NONE
-#SBATCH -o /lustre/software/pixi/gromacs-plumed-hpc/tmp/hrex-simple-%j.out
-#SBATCH -e /lustre/software/pixi/gromacs-plumed-hpc/tmp/hrex-simple-%j.err
+#SBATCH -o hrex-simple-%j.out
+#SBATCH -e hrex-simple-%j.err
 
 set -eo pipefail
 
-ROOT=/lustre/software/pixi/gromacs-plumed-hpc
+PIXI_DIR="/lustre/software/pixi/gromacs-plumed-hpc"
+ROOT="$SLURM_SUBMIT_DIR"
 DATA_DIR="$ROOT/hrex-data"
 RUN_DIR="$ROOT/test/hrex-simple-${SLURM_JOB_ID:-manual}"
 TMP_DIR="$ROOT/tmp"
+
+SRC_DATA_DIR="$PIXI_DIR/hrex-data"
+if [ ! -d "$DATA_DIR" ] || [ -z "$(find "$DATA_DIR" -mindepth 1 -print -quit 2>/dev/null)" ]; then
+    echo "Initializing HREX data: $DATA_DIR"
+    mkdir -p "$DATA_DIR"
+    cp -a "$SRC_DATA_DIR"/. "$DATA_DIR"/
+fi
 
 mkdir -p "$TMP_DIR"
 export TMPDIR="$TMP_DIR"
@@ -22,7 +30,7 @@ export TMP="$TMP_DIR"
 export TEMP="$TMP_DIR"
 export PIXI_CACHE_DIR="$TMP_DIR/pixi-cache"
 
-eval "$(/lustre/software/pixi/pixi shell-hook --as-is -m "$ROOT/pixi.toml")"
+eval "$(/lustre/software/pixi/pixi shell-hook --as-is -m "$PIXI_DIR/pixi.toml")"
 export SLURM_EXPORT_ENV=ALL
 
 export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
