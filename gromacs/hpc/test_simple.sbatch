@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-#SBATCH -J hrex-simple
+#SBATCH -J hrex-simple-gpu
 #SBATCH -p gpu-2-h
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:2
 #SBATCH --export=NONE
-#SBATCH -o hrex-simple-%j.out
-#SBATCH -e hrex-simple-%j.err
+#SBATCH -o hrex-simple-gpu-%j.out
+#SBATCH -e hrex-simple-gpu-%j.err
 
 set -eo pipefail
 

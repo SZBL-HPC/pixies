@@ -4,6 +4,7 @@
 #SBATCH -N 2
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=16
+#SBATCH --export=NONE
 #SBATCH -o hrex-simple-cpu-%j.out
 #SBATCH -e hrex-simple-cpu-%j.err
 
@@ -30,6 +31,7 @@ export TEMP="$TMP_DIR"
 export PIXI_CACHE_DIR="$TMP_DIR/pixi-cache"
 
 eval "$(/lustre/software/pixi/pixi shell-hook --as-is -m "$PIXI_DIR/pixi.toml")"
+export SLURM_EXPORT_ENV=ALL
 
 export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
 export OMP_PLACES=cores
